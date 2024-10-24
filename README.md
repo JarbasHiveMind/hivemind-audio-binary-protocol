@@ -1,6 +1,6 @@
 # HiveMind Listener
 
-Built on top of [hivemind-core](https://github.com/JarbasHiveMind/hivemind-core), it extends it with additional features:
+Built on top of [hivemind-core](https://github.com/JarbasHiveMind/hivemind-core) and [ovos-simple-listener](https://github.com/TigreGotico/ovos-simple-listener), it extends it with additional features:
 - Accepts audio streams
   - Binary data is also encrypted 
   - WakeWord, VAD, TTS and STT run on `hivemind-listener`
