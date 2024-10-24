@@ -100,17 +100,16 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         def on_msg(m: str):
             m: Message = Message.deserialize(m)
             hm: HiveMessage = HiveMessage(HiveMessageType.BUS, payload=m)
-            client.send(hm)
+            client.send(hm)  # forward listener messages to the client
             if m.msg_type == "recognizer_loop:utterance":
-                self.handle_message(hm, client)
+                self.handle_message(hm, client)  # process it as if it came from the client
 
         bus.on("message", on_msg)
 
-        mic: Microphone = FakeMicrophone()
         AudioReceiverProtocol.listeners[client.peer] = SimpleListener(
-            mic=mic,
+            mic=FakeMicrophone(),
             vad=self.vad,
-            wakeword=OVOSWakeWordFactory.create_hotword(self.wakeword),
+            wakeword=OVOSWakeWordFactory.create_hotword(self.wakeword),  # TODO allow different per client
             stt=self.stt,
             callbacks=HMCallbacks(bus)
         )
@@ -132,14 +131,6 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         self.stop_listener(client)
 
     @classmethod
-    def set_stt(cls, stt: STT):
-        cls.stt = stt
-
-    @classmethod
-    def set_tts(cls, tts: TTS):
-        cls.tts = tts
-
-    @classmethod
     def get_b64_tts(cls, message: Message = None) -> str:
         utterance = message.data['utterance']
         ctxt = cls.tts._get_ctxt({"message": message})
@@ -158,9 +149,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         utterances = cls.stt.transcribe(audio, lang)
         return utterances
 
-    def handle_binary_message(
-            self, message: HiveMessage, client: HiveMindClientConnection
-    ):
+    def handle_binary_message(self, message: HiveMessage, client: HiveMindClientConnection):
         assert message.msg_type == HiveMessageType.BINARY
         if message.bin_type == HiveMindBinaryPayloadType.RAW_AUDIO:
             bin_data = message.payload
