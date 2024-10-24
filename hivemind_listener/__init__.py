@@ -8,24 +8,22 @@ from typing import Dict, List, Tuple, Optional, Union
 import speech_recognition as sr
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_bus_client.util import get_mycroft_bus
-from ovos_tts_plugin_piper import PiperTTSPlugin
 
 from hivemind_bus_client.message import HiveMessage, HiveMessageType
 from hivemind_bus_client.serialization import HiveMindBinaryPayloadType
 from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
 from hivemind_core.service import HiveMindService
 from ovos_dinkum_listener.service import bytes2audiodata
-from ovos_dinkum_listener.voice_loop.hotwords import HotwordContainer
+from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
 from ovos_plugin_manager.templates.stt import STT
 from ovos_plugin_manager.templates.transformers import AudioLanguageDetector
 from ovos_plugin_manager.templates.tts import TTS
 from ovos_plugin_manager.templates.vad import VADEngine
+from ovos_plugin_manager.tts import OVOSTTSFactory
 from ovos_plugin_manager.vad import OVOSVADFactory
 from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
 from ovos_simple_listener import SimpleListener, ListenerCallbacks
-from ovos_stt_plugin_whisper_turbo import WhisperTurboSTT
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
@@ -87,10 +85,9 @@ class FakeMicrophone(Microphone):
 class AudioReceiverProtocol(HiveMindListenerProtocol):
     """"""
     wakeword: str = "hey_mycroft"
-    tts: TTS = PiperTTSPlugin(config={"voice": "alan-low", "lang": "en-gb"})  # OVOSTTSFactory.create()
-    stt: STT = WhisperTurboSTT(config={"use_cuda": True}) # OVOSSTTFactory.create()
+    tts: TTS = OVOSTTSFactory.create()
+    stt: STT = OVOSSTTFactory.create()
     vad: Optional[VADEngine] = OVOSVADFactory.create()
-    hotwords: Optional[HotwordContainer] = HotwordContainer(reload_allowed=False, autoload=True)
     lang_detector: Optional[AudioLanguageDetector] = None  # TODO
     listeners: Dict[str, SimpleListener] = {}
 
