@@ -1,0 +1,4 @@
+ovos-simple-listener
+hivemind_bus_client
+ovos-plugin-manager
+jarbas_hive_mind
