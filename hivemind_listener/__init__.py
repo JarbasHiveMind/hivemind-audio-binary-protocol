@@ -1,8 +1,11 @@
 import base64
 import queue
+import subprocess
 import threading
 from dataclasses import dataclass, field
 from queue import Queue
+from shutil import which
+from tempfile import NamedTemporaryFile
 from typing import Dict, List, Tuple, Optional, Union
 
 import speech_recognition as sr
@@ -13,7 +16,6 @@ from hivemind_bus_client.message import HiveMessage, HiveMessageType
 from hivemind_bus_client.serialization import HiveMindBinaryPayloadType
 from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
 from hivemind_core.service import HiveMindService
-from ovos_dinkum_listener.service import bytes2audiodata
 from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
 from ovos_plugin_manager.templates.stt import STT
@@ -26,6 +28,26 @@ from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
 from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
+
+
+def bytes2audiodata(data):
+    recognizer = sr.Recognizer()
+    with NamedTemporaryFile() as fp:
+        fp.write(data)
+        ffmpeg = which("ffmpeg")
+        if ffmpeg:
+            p = fp.name + "converted.wav"
+            # ensure file format
+            cmd = [ffmpeg, "-i", fp.name, "-acodec", "pcm_s16le", "-ar",
+                   "16000", "-ac", "1", "-f", "wav", p, "-y"]
+            subprocess.call(cmd)
+        else:
+            LOG.warning("ffmpeg not found, please ensure audio is in a valid format")
+            p = fp.name
+
+        with sr.AudioFile(p) as source:
+            audio = recognizer.record(source)
+    return audio
 
 
 class HMCallbacks(ListenerCallbacks):
