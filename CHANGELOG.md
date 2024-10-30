@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.0a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.0a1) (2024-10-30)
+## [0.2.1a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.1a1) (2024-10-30)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.1.0...0.2.0a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.0...0.2.1a1)
 
 **Merged pull requests:**
 
-- feat:binary handlers [\#1](https://github.com/JarbasHiveMind/hivemind-listener/pull/1) ([JarbasAl](https://github.com/JarbasAl))
+- fix:snd [\#3](https://github.com/JarbasHiveMind/hivemind-listener/pull/3) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
