@@ -57,7 +57,7 @@ class HMCallbacks(ListenerCallbacks):
     def listen_callback(cls):
         LOG.info("New loop state: IN_COMMAND")
         cls.bus.emit(Message("mycroft.audio.play_sound",
-                             {"uri": "smd/start_listening.wav"}))
+                             {"uri": "snd/start_listening.wav"}))
         cls.bus.emit(Message("recognizer_loop:wakeword"))
         cls.bus.emit(Message("recognizer_loop:record_begin"))
 
@@ -72,7 +72,7 @@ class HMCallbacks(ListenerCallbacks):
     def text_callback(cls, utterance: str, lang: str):
         LOG.info(f"STT: {utterance}")
         cls.bus.emit(Message("recognizer_loop:utterance",
-                             {"utterances": utterance, "lang": lang}))
+                             {"utterances": [utterance], "lang": lang}))
 
 
 @dataclass
