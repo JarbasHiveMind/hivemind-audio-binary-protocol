@@ -1,4 +1,4 @@
 ovos-simple-listener
-hivemind_bus_client
-ovos-plugin-manager
-jarbas_hive_mind
+hivemind_bus_client>=0.1.0,<1.0.0
+ovos-plugin-manager<1.0.0
+jarbas_hive_mind>=0.14.0,<1.0.0
