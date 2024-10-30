@@ -1,20 +1,12 @@
 # Changelog
 
-## [0.2.2a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.2a1) (2024-10-30)
+## [0.2.3a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.3a1) (2024-10-30)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.1a1...0.2.2a1)
-
-**Merged pull requests:**
-
-- fix:utterances [\#5](https://github.com/JarbasHiveMind/hivemind-listener/pull/5) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.1a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.1a1) (2024-10-30)
-
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.0...0.2.1a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.2...0.2.3a1)
 
 **Merged pull requests:**
 
-- fix:snd [\#3](https://github.com/JarbasHiveMind/hivemind-listener/pull/3) ([JarbasAl](https://github.com/JarbasAl))
+- fix:lazy load listener [\#7](https://github.com/JarbasHiveMind/hivemind-listener/pull/7) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
