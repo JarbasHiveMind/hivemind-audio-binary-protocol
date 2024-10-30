@@ -143,10 +143,6 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             AudioReceiverProtocol.listeners[client.peer].stop()
             AudioReceiverProtocol.listeners.pop(client.peer)
 
-    def handle_handshake_message(self, message: HiveMessage, client: HiveMindClientConnection):
-        super().handle_handshake_message(message, client)
-        self.add_listener(client)
-
     def handle_client_disconnected(self, client: HiveMindClientConnection):
         super().handle_client_disconnected(client)
         self.stop_listener(client)
@@ -179,16 +175,17 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
                                 sample_rate: int,
                                 sample_width: int,
                                 client: HiveMindClientConnection):
-        if client.peer in self.listeners:
-            m: FakeMicrophone = self.listeners[client.peer].mic
-            if m.sample_rate != sample_rate or m.sample_width != sample_width:
-                LOG.debug(f"Got {len(bin_data)} bytes of audio data from {client.peer}")
-                LOG.error(f"sample_rate/sample_width mismatch! "
-                          f"got: ({sample_rate}, {sample_width}) "
-                          f"expected: ({m.sample_rate}, {m.sample_width})")
-                # TODO - convert sample_rate if needed
-            else:
-                m.queue.put(bin_data)
+        if client.peer not in self.listeners:
+            self.add_listener(client)
+        m: FakeMicrophone = self.listeners[client.peer].mic
+        if m.sample_rate != sample_rate or m.sample_width != sample_width:
+            LOG.debug(f"Got {len(bin_data)} bytes of audio data from {client.peer}")
+            LOG.error(f"sample_rate/sample_width mismatch! "
+                      f"got: ({sample_rate}, {sample_width}) "
+                      f"expected: ({m.sample_rate}, {m.sample_width})")
+            # TODO - convert sample_rate if needed
+        else:
+            m.queue.put(bin_data)
 
     def handle_stt_transcribe_request(self, bin_data: bytes,
                                       sample_rate: int,
