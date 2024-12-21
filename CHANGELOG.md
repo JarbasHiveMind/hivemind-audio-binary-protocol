@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.4a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.4a1) (2024-12-21)
+## [0.3.0a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.3.0a1) (2024-12-21)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.3...0.2.4a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.4...0.3.0a1)
 
 **Merged pull requests:**
 
-- fix/update\_package [\#9](https://github.com/JarbasHiveMind/hivemind-listener/pull/9) ([JarbasAl](https://github.com/JarbasAl))
+- feat: cli interface [\#11](https://github.com/JarbasHiveMind/hivemind-listener/pull/11) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
