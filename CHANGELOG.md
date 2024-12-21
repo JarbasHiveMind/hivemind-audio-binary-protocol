@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.3a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.3a1) (2024-10-30)
+## [0.2.4a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.2.4a1) (2024-12-21)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.2...0.2.3a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.2.3...0.2.4a1)
 
 **Merged pull requests:**
 
-- fix:lazy load listener [\#7](https://github.com/JarbasHiveMind/hivemind-listener/pull/7) ([JarbasAl](https://github.com/JarbasAl))
+- fix/update\_package [\#9](https://github.com/JarbasHiveMind/hivemind-listener/pull/9) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
