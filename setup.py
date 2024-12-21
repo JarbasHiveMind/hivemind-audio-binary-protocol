@@ -52,6 +52,6 @@ setup(
     author_email="jarbasai@mailfence.com",
     description="Mesh Networking utilities for OpenVoiceOS",
     entry_points={
-        "console_scripts": ["hivemind-listener=hivemind_listener:run"]
+        "console_scripts": ["hivemind-listener=hivemind_listener:run_hivemind_listener"]
     },
 )

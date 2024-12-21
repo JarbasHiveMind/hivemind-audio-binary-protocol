@@ -8,13 +8,10 @@ from shutil import which
 from tempfile import NamedTemporaryFile
 from typing import Dict, List, Tuple, Optional, Union
 
+import click
 import speech_recognition as sr
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
-
-from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
-from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
-from hivemind_core.service import HiveMindService
 from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
 from ovos_plugin_manager.templates.stt import STT
@@ -27,6 +24,10 @@ from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
 from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
+
+from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
+from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
+from hivemind_core.service import HiveMindService
 
 
 def bytes2audiodata(data):
@@ -103,14 +104,26 @@ class FakeMicrophone(Microphone):
         self.queue.put_nowait(None)
 
 
+@dataclass
+class PluginOptions:
+    wakeword: str = "hey_mycroft"
+    tts: TTS = field(default_factory=OVOSTTSFactory.create)
+    stt: STT = field(default_factory=OVOSSTTFactory.create)
+    vad: VADEngine = field(default_factory=OVOSVADFactory.create)
+    lang_detector: Optional[AudioLanguageDetector] = None  # TODO
+
+
 class AudioReceiverProtocol(HiveMindListenerProtocol):
     """"""
-    wakeword: str = "hey_mycroft"
-    tts: TTS = OVOSTTSFactory.create()
-    stt: STT = OVOSSTTFactory.create()
-    vad: Optional[VADEngine] = OVOSVADFactory.create()
-    lang_detector: Optional[AudioLanguageDetector] = None  # TODO
     listeners: Dict[str, SimpleListener] = {}
+    plugin_opts: PluginOptions = None
+
+    @property
+    def plugins(self) -> PluginOptions:
+        if not self.plugin_opts:
+            # lazy load
+            self.plugin_opts = PluginOptions()
+        return self.plugin_opts
 
     def add_listener(self, client: HiveMindClientConnection):
         LOG.info(f"Creating listener for peer: {client.peer}")
@@ -129,9 +142,9 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
 
         AudioReceiverProtocol.listeners[client.peer] = SimpleListener(
             mic=FakeMicrophone(),
-            vad=self.vad,
-            wakeword=OVOSWakeWordFactory.create_hotword(self.wakeword),  # TODO allow different per client
-            stt=self.stt,
+            vad=self.plugins.vad,
+            wakeword=OVOSWakeWordFactory.create_hotword(self.plugins.wakeword),  # TODO allow different per client
+            stt=self.plugins.stt,
             callbacks=HMCallbacks(bus)
         )
         AudioReceiverProtocol.listeners[client.peer].start()
@@ -150,8 +163,8 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
     @classmethod
     def get_tts(cls, message: Message = None) -> str:
         utterance = message.data['utterance']
-        ctxt = cls.tts._get_ctxt({"message": message})
-        wav, _ = cls.tts.synth(utterance, ctxt)
+        ctxt = cls.plugins.tts._get_ctxt({"message": message})
+        wav, _ = cls.plugins.tts.synth(utterance, ctxt)
         return str(wav)
 
     @classmethod
@@ -165,10 +178,10 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
     @classmethod
     def transcribe_b64_audio(cls, message: Message = None) -> List[Tuple[str, float]]:
         b64audio = message.data["audio"]
-        lang = message.data.get("lang", cls.stt.lang)
+        lang = message.data.get("lang", cls.plugins.stt.lang)
         wav_data = base64.b64decode(b64audio)
         audio = bytes2audiodata(wav_data)
-        utterances = cls.stt.transcribe(audio, lang)
+        utterances = cls.plugins.stt.transcribe(audio, lang)
         return utterances
 
     def handle_microphone_input(self, bin_data: bytes,
@@ -194,7 +207,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
                                       client: HiveMindClientConnection):
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
         audio = sr.AudioData(bin_data, sample_rate, sample_width)
-        tx = self.stt.transcribe(audio, lang)
+        tx = self.plugins.stt.transcribe(audio, lang)
         m = Message("recognizer_loop:transcribe.response", {"transcriptions": tx, "lang": lang})
         client.send(HiveMessage(HiveMessageType.BUS, payload=m))
 
@@ -205,7 +218,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
                                   client: HiveMindClientConnection):
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
         audio = sr.AudioData(bin_data, sample_rate, sample_width)
-        tx = self.stt.transcribe(audio, lang)
+        tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
             m = Message("recognizer_loop:utterance",
@@ -259,10 +272,40 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             super().handle_inject_mycroft_msg(message, client)
 
 
-def run():
+@click.command()
+@click.option(
+    '--wakeword', default="hey_mycroft",
+    help="Specify the wake word for the listener. Default is 'hey_mycroft'. config will be loaded from mycroft.conf."
+)
+@click.option(
+    '--stt-plugin', default=None,
+    help="Specify the STT plugin to use. If not provided, the default STT from mycroft.conf will be used."
+)
+@click.option(
+    '--tts-plugin', default=None,
+    help="Specify the TTS plugin to use. If not provided, the default TTS from mycroft.conf will be used."
+)
+@click.option(
+    '--vad-plugin', default=None,
+    help="Specify the VAD plugin to use. If not provided, the default VAD from mycroft.conf will be used."
+)
+def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin):
+    """
+    Run the HiveMind Listener with configurable plugins.
+    """
+    # Configure wakeword, TTS, STT, and VAD plugins
+    AudioReceiverProtocol.plugin_opts = PluginOptions(
+        wakeword=wakeword,
+        stt=OVOSSTTFactory.create(stt_plugin) if stt_plugin else OVOSSTTFactory.create(),
+        tts=OVOSTTSFactory.create(tts_plugin) if tts_plugin else OVOSTTSFactory.create(),
+        vad=OVOSVADFactory.create(vad_plugin) if vad_plugin else OVOSVADFactory.create()
+    )
+
+    # Start the service
+    click.echo(f"Starting HiveMind Listener with wakeword '{wakeword}'...")
     service = HiveMindService(protocol=AudioReceiverProtocol)
     service.run()
 
 
 if __name__ == "__main__":
-    run()
+    run_hivemind_listener()
