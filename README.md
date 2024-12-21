@@ -43,15 +43,37 @@ Usage: hivemind-listener [OPTIONS]
   Run the HiveMind Listener with configurable plugins.
 
 Options:
-  --wakeword TEXT    Specify the wake word for the listener. Default is
-                     'hey_mycroft'. config will be loaded from mycroft.conf.
-  --stt-plugin TEXT  Specify the STT plugin to use. If not provided, the
-                     default STT from mycroft.conf will be used.
-  --tts-plugin TEXT  Specify the TTS plugin to use. If not provided, the
-                     default TTS from mycroft.conf will be used.
-  --vad-plugin TEXT  Specify the VAD plugin to use. If not provided, the
-                     default VAD from mycroft.conf will be used.
-  --help             Show this message and exit.
+  --wakeword TEXT                 Specify the wake word for the listener.
+                                  Default is 'hey_mycroft'. config will be
+                                  loaded from mycroft.conf.
+  --stt-plugin TEXT               Specify the STT plugin to use. If not
+                                  provided, the default STT from mycroft.conf
+                                  will be used.
+  --tts-plugin TEXT               Specify the TTS plugin to use. If not
+                                  provided, the default TTS from mycroft.conf
+                                  will be used.
+  --vad-plugin TEXT               Specify the VAD plugin to use. If not
+                                  provided, the default VAD from mycroft.conf
+                                  will be used.
+  --ovos_bus_address TEXT         Open Voice OS bus address
+  --ovos_bus_port INTEGER         Open Voice OS bus port number
+  --host TEXT                     HiveMind host
+  --port INTEGER                  HiveMind port number
+  --ssl BOOLEAN                   use wss://
+  --cert_dir TEXT                 HiveMind SSL certificate directory
+  --cert_name TEXT                HiveMind SSL certificate file name
+  --db-backend [redis|json|sqlite]
+                                  Select the database backend to use. Options:
+                                  redis, sqlite, json.
+  --db-name TEXT                  [json/sqlite] The name for the database
+                                  file. ~/.cache/hivemind-core/{name}
+  --db-folder TEXT                [json/sqlite] The subfolder where database
+                                  files are stored. ~/.cache/{db_folder}}
+  --redis-host TEXT               [redis] Host for Redis. Default is
+                                  localhost.
+  --redis-port INTEGER            [redis] Port for Redis. Default is 6379.
+  --redis-password TEXT           [redis] Password for Redis. Default None
+  --help                          Show this message and exit.
 ```
 
 ---

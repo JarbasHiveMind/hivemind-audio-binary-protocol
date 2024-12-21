@@ -24,9 +24,12 @@ from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
 from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
+from ovos_utils.xdg_utils import xdg_data_home
 
 from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
+from hivemind_core.database import ClientDatabase
 from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
+from hivemind_core.scripts import get_db_kwargs
 from hivemind_core.service import HiveMindService
 
 
@@ -402,26 +405,53 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
 
 
 @click.command()
-@click.option(
-    '--wakeword', default="hey_mycroft",
-    help="Specify the wake word for the listener. Default is 'hey_mycroft'. config will be loaded from mycroft.conf."
-)
-@click.option(
-    '--stt-plugin', default=None,
-    help="Specify the STT plugin to use. If not provided, the default STT from mycroft.conf will be used."
-)
-@click.option(
-    '--tts-plugin', default=None,
-    help="Specify the TTS plugin to use. If not provided, the default TTS from mycroft.conf will be used."
-)
-@click.option(
-    '--vad-plugin', default=None,
-    help="Specify the VAD plugin to use. If not provided, the default VAD from mycroft.conf will be used."
-)
-def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin):
+@click.option('--wakeword', default="hey_mycroft",
+              help="Specify the wake word for the listener. Default is 'hey_mycroft'. config will be loaded from mycroft.conf.")
+@click.option('--stt-plugin', default=None,
+              help="Specify the STT plugin to use. If not provided, the default STT from mycroft.conf will be used.")
+@click.option('--tts-plugin', default=None,
+              help="Specify the TTS plugin to use. If not provided, the default TTS from mycroft.conf will be used.")
+@click.option('--vad-plugin', default=None,
+              help="Specify the VAD plugin to use. If not provided, the default VAD from mycroft.conf will be used.")
+@click.option("--ovos_bus_address", help="Open Voice OS bus address", type=str, default="127.0.0.1")
+@click.option("--ovos_bus_port", help="Open Voice OS bus port number", type=int, default=8181)
+@click.option("--host", help="HiveMind host", type=str, default="0.0.0.0")
+@click.option("--port", help="HiveMind port number", type=int, required=False)
+@click.option("--ssl", help="use wss://", type=bool, default=False)
+@click.option("--cert_dir", help="HiveMind SSL certificate directory", type=str, default=f"{xdg_data_home()}/hivemind")
+@click.option("--cert_name", help="HiveMind SSL certificate file name", type=str, default="hivemind")
+@click.option("--db-backend", type=click.Choice(['redis', 'json', 'sqlite'], case_sensitive=False), default='json',
+              help="Select the database backend to use. Options: redis, sqlite, json.")
+@click.option("--db-name", type=str, default="clients",
+              help="[json/sqlite] The name for the database file. ~/.cache/hivemind-core/{name}")
+@click.option("--db-folder", type=str, default="hivemind-core",
+              help="[json/sqlite] The subfolder where database files are stored. ~/.cache/{db_folder}}")
+@click.option("--redis-host", default="localhost", help="[redis] Host for Redis. Default is localhost.")
+@click.option("--redis-port", default=6379, help="[redis] Port for Redis. Default is 6379.")
+@click.option("--redis-password", required=False, help="[redis] Password for Redis. Default None")
+def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
+                          ovos_bus_address: str, ovos_bus_port: int, host: str, port: int,
+                          ssl: bool, cert_dir: str, cert_name: str,
+                          db_backend, db_name, db_folder,
+                          redis_host, redis_port, redis_password
+                          ):
     """
     Run the HiveMind Listener with configurable plugins.
     """
+    kwargs = get_db_kwargs(db_backend, db_name, db_folder, redis_host, redis_port, redis_password)
+    ovos_bus_config = {
+        "host": ovos_bus_address or "127.0.0.1",
+        "port": ovos_bus_port or 8181,
+    }
+
+    websocket_config = {
+        "host": host,
+        "port": port or 5678,
+        "ssl": ssl or False,
+        "cert_dir": cert_dir,
+        "cert_name": cert_name,
+    }
+
     # Configure wakeword, TTS, STT, and VAD plugins
     AudioReceiverProtocol.plugin_opts = PluginOptions(
         wakeword=wakeword,
@@ -432,7 +462,11 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin):
 
     # Start the service
     click.echo(f"Starting HiveMind Listener with wakeword '{wakeword}'...")
-    service = HiveMindService(protocol=AudioReceiverProtocol)
+    service = HiveMindService(
+        ovos_bus_config=ovos_bus_config,
+        websocket_config=websocket_config,
+        db=ClientDatabase(**kwargs),
+        protocol=AudioReceiverProtocol)
     service.run()
 
 
