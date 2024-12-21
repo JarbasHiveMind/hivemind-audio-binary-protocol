@@ -6,7 +6,7 @@ BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_version():
     """Find the version of the package"""
-    version_file = os.path.join(BASEDIR, "hivemind_listener", "version.py")
+    version_file = os.path.join(BASEDIR, "hivemind_audio_binary_protocol", "version.py")
     major, minor, build, alpha = (None, None, None, None)
     with open(version_file) as f:
         for line in f:
@@ -38,15 +38,15 @@ def required(requirements_file):
             ]
         return [pkg for pkg in requirements if pkg.strip() and not pkg.startswith("#")]
 
-PLUGIN_ENTRY_POINT = 'hivemind-audio-binary-protocol-plugin=hivemind_listener.protocol:AudioBinaryProtocol'
+PLUGIN_ENTRY_POINT = 'hivemind-audio-binary-protocol-plugin=hivemind_audio_binary_protocol.protocol:AudioBinaryProtocol'
 
 setup(
-    name="hivemind-listener",
+    name="hivemind-audio-binary-protocol",
     version=get_version(),
-    packages=["hivemind_listener"],
+    packages=["hivemind_audio_binary_protocol"],
     include_package_data=True,
     install_requires=required("requirements.txt"),
-    url="https://github.com/JarbasHiveMind/HiveMind-listener",
+    url="https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol",
     license="Apache2.0",
     author="jarbasAI",
     author_email="jarbasai@mailfence.com",

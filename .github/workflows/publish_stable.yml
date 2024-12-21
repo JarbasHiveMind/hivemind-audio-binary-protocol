@@ -10,7 +10,7 @@ jobs:
     secrets: inherit
     with:
       branch: 'master'
-      version_file: 'hivemind_listener/version.py'
+      version_file: 'hivemind_audio_binary_protocol/version.py'
       setup_py: 'setup.py'
       publish_release: true
 

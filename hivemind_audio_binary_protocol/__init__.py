@@ -1,18 +1,17 @@
+import base64
 import queue
 import subprocess
 import threading
-import time
 from dataclasses import dataclass, field
 from queue import Queue
 from shutil import which
 from tempfile import NamedTemporaryFile
-from typing import Dict, Any, List, Tuple, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union
 
-import pybase64
+import click
 import speech_recognition as sr
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_bus_client.util import get_message_lang
 from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
 from ovos_plugin_manager.templates.stt import STT
@@ -25,13 +24,13 @@ from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
 from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
+from ovos_utils.xdg_utils import xdg_data_home
 
 from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
-from hivemind_core.protocol import HiveMindClientConnection
-from hivemind_listener.transformers import (DialogTransformersService,
-                                            MetadataTransformersService,
-                                            UtteranceTransformersService)
-from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol, ClientCallbacks
+from hivemind_core.database import ClientDatabase
+from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
+from hivemind_core.scripts import get_db_kwargs
+from hivemind_core.service import HiveMindService
 
 
 def bytes2audiodata(data: bytes) -> sr.AudioData:
@@ -63,7 +62,7 @@ def bytes2audiodata(data: bytes) -> sr.AudioData:
     return audio
 
 
-class AudioCallbacks(ListenerCallbacks):
+class HMCallbacks(ListenerCallbacks):
     """
     Callbacks for handling various stages of audio recognition
     """
@@ -170,90 +169,27 @@ class PluginOptions:
     stt: STT = field(default_factory=OVOSSTTFactory.create)
     vad: VADEngine = field(default_factory=OVOSVADFactory.create)
     lang_detector: Optional[AudioLanguageDetector] = None  # TODO: Implement language detection.
-    utterance_transformers: List[str] = field(default_factory=list)
-    metadata_transformers: List[str] = field(default_factory=list)
-    dialog_transformers: List[str] = field(default_factory=list)
 
 
-@dataclass
-class AudioBinaryProtocol(BinaryDataHandlerProtocol):
-    """wrapper for encapsulating logic for handling incoming binary data"""
-    plugins: Optional[PluginOptions] = None
-    utterance_transformers: Optional[UtteranceTransformersService] = None
-    metadata_transformers: Optional[MetadataTransformersService] = None
-    dialog_transformers: Optional[DialogTransformersService] = None
-    config: Dict[str, Any] = field(default_factory=dict)
-    hm_protocol: Optional['AudioReceiverProtocol'] = None
-    callbacks: Optional[ClientCallbacks] = None
-    listeners = {}
+class AudioReceiverProtocol(HiveMindListenerProtocol):
+    """
+    Protocol for receiving and processing audio data in HiveMind.
+    """
+    listeners: Dict[str, SimpleListener] = {}
+    plugin_opts: PluginOptions = None
 
-    def __post_init__(self):
-        # Configure wakeword, TTS, STT, and VAD plugins
-        if self.plugins is None:
+    @property
+    def plugins(self) -> PluginOptions:
+        """
+        Lazily load and return the plugin options.
 
-            if not self.config:
-                LOG.warning("No config passed to AudioBinaryProtocol, "
-                            "reading mycroft.conf to select plugins")
-                # use regular mycroft.conf
-                from ovos_config import Configuration
-                config = Configuration()
-                self.config["stt"] = config["stt"]
-                self.config["tts"] = config["tts"]
-                self.config["vad"] = config["listener"]["VAD"]
-                self.config["wakeword"] = config["listener"]["wake_word"]
-                self.config["hotwords"] = config["hotwords"]
-                self.config["utterance_transformers"] = list(config.get("utterance_transformers", {}))
-                self.config["dialog_transformers"] = list(config.get("dialog_transformers", {}))
-                self.config["metadata_transformers"] = list(config.get("metadata_transformers", {}))
-
-            LOG.debug(f"Loading STT '{self.config['stt']['module']}': {self.config['stt']}")
-            stt = OVOSSTTFactory.create(self.config["stt"])
-            LOG.debug(f"Loading TTS '{self.config['tts']['module']}': {self.config['tts']}")
-            tts = OVOSTTSFactory.create(self.config["tts"])
-            LOG.debug(f"Loading VAD '{self.config['vad']['module']}': {self.config['vad']}")
-            vad = OVOSVADFactory.create(self.config["vad"])
-
-            self.plugins = PluginOptions(
-                wakeword=self.config["wakeword"],  # TODO - allow per client
-                stt=stt,
-                tts=tts,
-                vad=vad,
-                dialog_transformers=self.config.get("dialog_transformers", []),
-                utterance_transformers=self.config.get("utterance_transformers", []),
-                metadata_transformers=self.config.get("metadata_transformers", [])
-            )
-
-        if self.utterance_transformers is None:
-            self.utterance_transformers = UtteranceTransformersService(
-                self.agent_protocol.bus, self.plugins.utterance_transformers)
-        if self.dialog_transformers is None:
-            self.dialog_transformers = DialogTransformersService(
-                self.agent_protocol.bus, self.plugins.dialog_transformers)
-        if self.metadata_transformers is None:
-            self.metadata_transformers = MetadataTransformersService(
-                self.agent_protocol.bus, self.plugins.metadata_transformers)
-
-        # ensure client audio listener is closed when client disconnects
-        if not self.callbacks:
-            self.callbacks = ClientCallbacks(on_disconnect=AudioBinaryProtocol.stop_listener)
-        else:
-            original = self.callbacks.on_disconnect
-
-            def wrapper(c):
-                try:
-                    original(c)
-                except:
-                    raise
-                finally:
-                    AudioBinaryProtocol.stop_listener(c)
-
-            self.callbacks.on_disconnect = wrapper
-
-        # agent protocol payloads with binary audio results
-        self.agent_protocol.bus.on("recognizer_loop:b64_audio", self.handle_audio_b64)
-        self.agent_protocol.bus.on("recognizer_loop:b64_transcribe", self.handle_transcribe_b64)
-        self.agent_protocol.bus.on("speak:b64_audio", self.handle_speak_b64)
-        self.agent_protocol.bus.on("speak:synth", self.handle_speak_synth)
+        Returns:
+            The loaded PluginOptions instance.
+        """
+        if not self.plugin_opts:
+            # lazy load
+            self.plugin_opts = PluginOptions()
+        return self.plugin_opts
 
     def add_listener(self, client: HiveMindClientConnection) -> None:
         """
@@ -272,22 +208,18 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             hm: HiveMessage = HiveMessage(HiveMessageType.BUS, payload=m)
             client.send(hm)  # forward listener messages to the client
             if m.msg_type == "recognizer_loop:utterance":
-                self.hm_protocol.handle_message(hm, client)  # process it as if it came from the client
+                self.handle_message(hm, client)  # process it as if it came from the client
 
         bus.on("message", on_msg)
 
-        # TODO allow different per client
-        ww_cfg = self.config["hotwords"][self.plugins.wakeword]
-        LOG.debug(f"Loading client Wake Word '{self.plugins.wakeword}': {ww_cfg}")
-
-        AudioBinaryProtocol.listeners[client.peer] = SimpleListener(
+        AudioReceiverProtocol.listeners[client.peer] = SimpleListener(
             mic=FakeMicrophone(),
             vad=self.plugins.vad,
-            wakeword=OVOSWakeWordFactory.create_hotword(self.plugins.wakeword, self.config["hotwords"]),
+            wakeword=OVOSWakeWordFactory.create_hotword(self.plugins.wakeword),  # TODO allow different per client
             stt=self.plugins.stt,
-            callbacks=AudioCallbacks(bus)
+            callbacks=HMCallbacks(bus)
         )
-        AudioBinaryProtocol.listeners[client.peer].start()
+        AudioReceiverProtocol.listeners[client.peer].start()
 
     @classmethod
     def stop_listener(cls, client: HiveMindClientConnection) -> None:
@@ -297,37 +229,20 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         Args:
             client: The HiveMind client connection.
         """
-        if client.peer in cls.listeners:
+        if client.peer in AudioReceiverProtocol.listeners:
             LOG.info(f"Stopping listener for key: {client.peer}")
-            cls.listeners[client.peer].stop()
-            cls.listeners.pop(client.peer)
+            AudioReceiverProtocol.listeners[client.peer].stop()
+            AudioReceiverProtocol.listeners.pop(client.peer)
 
-    # helpers
-    def transform_utterances(self, utterances: List[str], lang: str) -> Tuple[str, Dict]:
+    def handle_client_disconnected(self, client: HiveMindClientConnection) -> None:
         """
-        Pipe utterance through transformer plugins to get more metadata.
-        Utterances may be modified by any parser and context overwritten
-        """
-        original = list(utterances)
-        context = {}
-        if utterances:
-            utterances, context = self.utterance_transformers.transform(utterances, dict(lang=lang))
-            if original != utterances:
-                LOG.debug(f"utterances transformed: {original} -> {utterances}")
-        return utterances, context
+        Handle a client disconnection event.
 
-    def transform_dialogs(self, utterance: str, lang: str) -> Tuple[str, Dict]:
+        Args:
+            client: The HiveMind client connection.
         """
-        Pipe utterance through transformer plugins to get more metadata.
-        Utterances may be modified by any parser and context overwritten
-        """
-        original = utterance
-        context = {}
-        if utterance:
-            utterance, context = self.dialog_transformers.transform(utterance, dict(lang=lang))
-            if original != utterance:
-                LOG.debug(f"speak transformed: {original} -> {utterance}")
-        return utterance, context
+        super().handle_client_disconnected(client)
+        self.stop_listener(client)
 
     def get_tts(self, message: Optional[Message] = None) -> str:
         """
@@ -358,12 +273,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         # cast to str() to get a path, as it is a AudioFile object from tts cache
         with open(wav, "rb") as f:
             audio = f.read()
-
-        s = time.monotonic()
-        encoded = pybase64.b64encode(audio).decode("utf-8")
-        LOG.debug(f"b64 encoding took: {time.monotonic() - s} seconds")
-
-        return encoded
+        return base64.b64encode(audio).decode("utf-8")
 
     def transcribe_b64_audio(self, message: Optional[Message] = None) -> List[Tuple[str, float]]:
         """
@@ -377,15 +287,11 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         """
         b64audio = message.data["audio"]
         lang = message.data.get("lang", self.plugins.stt.lang)
-
-        s = time.monotonic()
-        wav_data = pybase64.b64decode(b64audio)
-        LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
-
+        wav_data = base64.b64decode(b64audio)
         audio = bytes2audiodata(wav_data)
-        return self.plugins.stt.transcribe(audio, lang)
+        utterances = self.plugins.stt.transcribe(audio, lang)
+        return utterances
 
-    ###############
     def handle_microphone_input(self, bin_data: bytes, sample_rate: int, sample_width: int,
                                 client: HiveMindClientConnection) -> None:
         """
@@ -443,63 +349,126 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
-            utts, context = self.transform_utterances(utts, lang)
-            context = self.metadata_transformers.transform(context)
             m = Message("recognizer_loop:utterance",
-                        {"utterances": utts, "lang": lang},
-                        context=context)
-            self.hm_protocol.handle_inject_agent_msg(m, client)
+                        {"utterances": utts, "lang": lang})
+            self.handle_inject_mycroft_msg(m, client)
         else:
             LOG.info(f"STT transcription error for client: {client.peer}")
             m = Message("recognizer_loop:speech.recognition.unknown")
             client.send(HiveMessage(HiveMessageType.BUS, payload=m))
 
-    def handle_audio_b64(self, message: Message):
-        lang = get_message_lang(message)
-        transcriptions = self.transcribe_b64_audio(message)
-        transcriptions, context = self.transform_utterances([u[0] for u in transcriptions], lang=lang)
-        context = self.metadata_transformers.transform(context)
-        msg: Message = message.forward("recognizer_loop:utterance",
-                                       {"utterances": transcriptions, "lang": lang})
-        msg.context.update(context)
-        self.hm_protocol.agent_protocol.bus.emit(msg)
+    def handle_inject_mycroft_msg(self, message: Message, client: HiveMindClientConnection) -> None:
+        """
+        Handle injection of Mycroft bus messages into the HiveMind system.
 
-    def handle_transcribe_b64(self, message: Message):
-        lang = get_message_lang(message)
-        client = self.hm_protocol.clients[message.context["source"]]
-        msg: Message = message.reply("recognizer_loop:b64_transcribe.response",
-                                     {"lang": lang})
-        msg.data["transcriptions"] = self.transcribe_b64_audio(message)
-        if msg.context.get("destination") is None:
-            msg.context["destination"] = "skills"  # ensure not treated as a broadcast
-        payload = HiveMessage(HiveMessageType.BUS, msg)
+        Args:
+            message (Message): Mycroft bus message object.
+            client (HiveMindClientConnection): Connection object for the client receiving the response.
+        """
+        if message.msg_type == "speak:synth":
+            wav = self.get_tts(message)
+            with open(wav, "rb") as f:
+                bin_data = f.read()
+            payload = HiveMessage(HiveMessageType.BINARY,
+                                  payload=bin_data,
+                                  metadata={"lang": message.data["lang"],
+                                            "file_name": wav.split("/")[-1],
+                                            "utterance": message.data["utterance"]},
+                                  bin_type=HiveMindBinaryPayloadType.TTS_AUDIO)
+            client.send(payload)
+            return
+        elif message.msg_type == "speak:b64_audio":
+            msg: Message = message.reply("speak:b64_audio.response", message.data)
+            msg.data["audio"] = self.get_b64_tts(message)
+            if msg.context.get("destination") is None:
+                msg.context["destination"] = "audio"  # ensure not treated as a broadcast
+            payload = HiveMessage(HiveMessageType.BUS, msg)
+            client.send(payload)
+            return
+        elif message.msg_type == "recognizer_loop:b64_transcribe":
+            msg: Message = message.reply("recognizer_loop:b64_transcribe.response",
+                                         {"lang": message.data["lang"]})
+            msg.data["transcriptions"] = self.transcribe_b64_audio(message)
+            if msg.context.get("destination") is None:
+                msg.context["destination"] = "skills"  # ensure not treated as a broadcast
+            payload = HiveMessage(HiveMessageType.BUS, msg)
+            client.send(payload)
+            return
+        elif message.msg_type == "recognizer_loop:b64_audio":
+            transcriptions = self.transcribe_b64_audio(message)
+            msg: Message = message.forward("recognizer_loop:utterance",
+                                           {"utterances": [u[0] for u in transcriptions],
+                                            "lang": self.stt.lang})
+            super().handle_inject_mycroft_msg(msg, client)
+        else:
+            super().handle_inject_mycroft_msg(message, client)
 
-        client.send(payload)
 
-    def handle_speak_b64(self, message: Message):
-        client = self.hm_protocol.clients[message.context["source"]]
+@click.command()
+@click.option('--wakeword', default="hey_mycroft",
+              help="Specify the wake word for the listener. Default is 'hey_mycroft'. config will be loaded from mycroft.conf.")
+@click.option('--stt-plugin', default=None,
+              help="Specify the STT plugin to use. If not provided, the default STT from mycroft.conf will be used.")
+@click.option('--tts-plugin', default=None,
+              help="Specify the TTS plugin to use. If not provided, the default TTS from mycroft.conf will be used.")
+@click.option('--vad-plugin', default=None,
+              help="Specify the VAD plugin to use. If not provided, the default VAD from mycroft.conf will be used.")
+@click.option("--ovos_bus_address", help="Open Voice OS bus address", type=str, default="127.0.0.1")
+@click.option("--ovos_bus_port", help="Open Voice OS bus port number", type=int, default=8181)
+@click.option("--host", help="HiveMind host", type=str, default="0.0.0.0")
+@click.option("--port", help="HiveMind port number", type=int, required=False)
+@click.option("--ssl", help="use wss://", type=bool, default=False)
+@click.option("--cert_dir", help="HiveMind SSL certificate directory", type=str, default=f"{xdg_data_home()}/hivemind")
+@click.option("--cert_name", help="HiveMind SSL certificate file name", type=str, default="hivemind")
+@click.option("--db-backend", type=click.Choice(['redis', 'json', 'sqlite'], case_sensitive=False), default='json',
+              help="Select the database backend to use. Options: redis, sqlite, json.")
+@click.option("--db-name", type=str, default="clients",
+              help="[json/sqlite] The name for the database file. ~/.cache/hivemind-core/{name}")
+@click.option("--db-folder", type=str, default="hivemind-core",
+              help="[json/sqlite] The subfolder where database files are stored. ~/.cache/{db_folder}}")
+@click.option("--redis-host", default="localhost", help="[redis] Host for Redis. Default is localhost.")
+@click.option("--redis-port", default=6379, help="[redis] Port for Redis. Default is 6379.")
+@click.option("--redis-password", required=False, help="[redis] Password for Redis. Default None")
+def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
+                          ovos_bus_address: str, ovos_bus_port: int, host: str, port: int,
+                          ssl: bool, cert_dir: str, cert_name: str,
+                          db_backend, db_name, db_folder,
+                          redis_host, redis_port, redis_password
+                          ):
+    """
+    Run the HiveMind Listener with configurable plugins.
+    """
+    kwargs = get_db_kwargs(db_backend, db_name, db_folder, redis_host, redis_port, redis_password)
+    ovos_bus_config = {
+        "host": ovos_bus_address or "127.0.0.1",
+        "port": ovos_bus_port or 8181,
+    }
 
-        msg: Message = message.reply("speak:b64_audio.response", message.data)
-        msg.data["audio"] = self.get_b64_tts(message)
-        if msg.context.get("destination") is None:
-            msg.context["destination"] = "audio"  # ensure not treated as a broadcast
-        payload = HiveMessage(HiveMessageType.BUS, msg)
-        client.send(payload)
+    websocket_config = {
+        "host": host,
+        "port": port or 5678,
+        "ssl": ssl or False,
+        "cert_dir": cert_dir,
+        "cert_name": cert_name,
+    }
 
-    def handle_speak_synth(self, message: Message):
-        client = self.hm_protocol.clients[message.context["source"]]
-        lang = get_message_lang(message)
+    # Configure wakeword, TTS, STT, and VAD plugins
+    AudioReceiverProtocol.plugin_opts = PluginOptions(
+        wakeword=wakeword,
+        stt=OVOSSTTFactory.create(stt_plugin) if stt_plugin else OVOSSTTFactory.create(),
+        tts=OVOSTTSFactory.create(tts_plugin) if tts_plugin else OVOSTTSFactory.create(),
+        vad=OVOSVADFactory.create(vad_plugin) if vad_plugin else OVOSVADFactory.create()
+    )
 
-        message.data["utterance"], context = self.transform_dialogs(message.data["utterance"], lang)
-        wav = self.get_tts(message)
-        with open(wav, "rb") as f:
-            bin_data = f.read()
-        metadata = {"lang": lang,
-                    "file_name": wav.split("/")[-1],
-                    "utterance": message.data["utterance"]}
-        metadata.update(context)
-        payload = HiveMessage(HiveMessageType.BINARY,
-                              payload=bin_data,
-                              metadata=metadata,
-                              bin_type=HiveMindBinaryPayloadType.TTS_AUDIO)
-        client.send(payload)
+    # Start the service
+    click.echo(f"Starting HiveMind Listener with wakeword '{wakeword}'...")
+    service = HiveMindService(
+        ovos_bus_config=ovos_bus_config,
+        websocket_config=websocket_config,
+        db=ClientDatabase(**kwargs),
+        protocol=AudioReceiverProtocol)
+    service.run()
+
+
+if __name__ == "__main__":
+    run_hivemind_listener()
