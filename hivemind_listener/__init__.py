@@ -12,6 +12,8 @@ import click
 import speech_recognition as sr
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
+from ovos_bus_client.util import get_message_lang
+from ovos_config import Configuration
 from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
 from ovos_plugin_manager.templates.stt import STT
@@ -31,6 +33,9 @@ from hivemind_core.database import ClientDatabase
 from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
 from hivemind_core.scripts import get_db_kwargs
 from hivemind_core.service import HiveMindService
+from hivemind_listener.transformers import (DialogTransformersService,
+                                            MetadataTransformersService,
+                                            UtteranceTransformersService)
 
 
 def bytes2audiodata(data: bytes) -> sr.AudioData:
@@ -169,6 +174,9 @@ class PluginOptions:
     stt: STT = field(default_factory=OVOSSTTFactory.create)
     vad: VADEngine = field(default_factory=OVOSVADFactory.create)
     lang_detector: Optional[AudioLanguageDetector] = None  # TODO: Implement language detection.
+    utterance_transformers: List[str] = field(default_factory=list)
+    metadata_transformers: List[str] = field(default_factory=list)
+    dialog_transformers: List[str] = field(default_factory=list)
 
 
 class AudioReceiverProtocol(HiveMindListenerProtocol):
@@ -177,6 +185,17 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
     """
     listeners: Dict[str, SimpleListener] = {}
     plugin_opts: PluginOptions = None
+    utterance_transformers: Optional[UtteranceTransformersService] = None
+    metadata_transformers: Optional[MetadataTransformersService] = None
+    dialog_transformers: Optional[DialogTransformersService] = None
+
+    def bind(self, websocket, bus, identity, db: ClientDatabase):
+        super().bind(websocket, bus, identity, db)
+        self.utterance_transformers = UtteranceTransformersService(bus,
+                                                                   AudioReceiverProtocol.plugin_opts.utterance_transformers)
+        self.metadata_transformers = MetadataTransformersService(bus,
+                                                                 AudioReceiverProtocol.plugin_opts.metadata_transformers)
+        self.dialog_transformers = DialogTransformersService(bus, AudioReceiverProtocol.plugin_opts.dialog_transformers)
 
     @property
     def plugins(self) -> PluginOptions:
@@ -244,6 +263,32 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         super().handle_client_disconnected(client)
         self.stop_listener(client)
 
+    def _handle_utt_transformers(self, utterances: List[str], lang: str) -> Tuple[str, Dict]:
+        """
+        Pipe utterance through transformer plugins to get more metadata.
+        Utterances may be modified by any parser and context overwritten
+        """
+        original = list(utterances)
+        context = {}
+        if utterances:
+            utterances, context = self.utterance_transformers.transform(utterances, dict(lang=lang))
+            if original != utterances:
+                LOG.debug(f"utterances transformed: {original} -> {utterances}")
+        return utterances, context
+
+    def _handle_dialog_transformers(self, utterance: str, lang: str) -> Tuple[str, Dict]:
+        """
+        Pipe utterance through transformer plugins to get more metadata.
+        Utterances may be modified by any parser and context overwritten
+        """
+        original = utterance
+        context = {}
+        if utterance:
+            utterance, context = self.dialog_transformers.transform(utterance, dict(lang=lang))
+            if original != utterance:
+                LOG.debug(f"speak transformed: {original} -> {utterance}")
+        return utterance, context
+
     def get_tts(self, message: Optional[Message] = None) -> str:
         """
         Generate TTS audio for the given utterance.
@@ -289,8 +334,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         lang = message.data.get("lang", self.plugins.stt.lang)
         wav_data = base64.b64decode(b64audio)
         audio = bytes2audiodata(wav_data)
-        utterances = self.plugins.stt.transcribe(audio, lang)
-        return utterances
+        return self.plugins.stt.transcribe(audio, lang)
 
     def handle_microphone_input(self, bin_data: bytes, sample_rate: int, sample_width: int,
                                 client: HiveMindClientConnection) -> None:
@@ -349,8 +393,11 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
+            utts, context = self._handle_utt_transformers(utts, lang)
+            context = self.metadata_transformers.transform(context)
             m = Message("recognizer_loop:utterance",
-                        {"utterances": utts, "lang": lang})
+                        {"utterances": utts, "lang": lang},
+                        context=context)
             self.handle_inject_mycroft_msg(m, client)
         else:
             LOG.info(f"STT transcription error for client: {client.peer}")
@@ -365,15 +412,19 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             message (Message): Mycroft bus message object.
             client (HiveMindClientConnection): Connection object for the client receiving the response.
         """
+        lang = get_message_lang(message)
         if message.msg_type == "speak:synth":
+            message.data["utterance"], context = self._handle_dialog_transformers(message.data["utterance"], lang)
             wav = self.get_tts(message)
             with open(wav, "rb") as f:
                 bin_data = f.read()
+            metadata = {"lang": lang,
+                        "file_name": wav.split("/")[-1],
+                        "utterance": message.data["utterance"]}
+            metadata.update(context)
             payload = HiveMessage(HiveMessageType.BINARY,
                                   payload=bin_data,
-                                  metadata={"lang": message.data["lang"],
-                                            "file_name": wav.split("/")[-1],
-                                            "utterance": message.data["utterance"]},
+                                  metadata=metadata,
                                   bin_type=HiveMindBinaryPayloadType.TTS_AUDIO)
             client.send(payload)
             return
@@ -396,23 +447,31 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             return
         elif message.msg_type == "recognizer_loop:b64_audio":
             transcriptions = self.transcribe_b64_audio(message)
+            transcriptions, context = self._handle_utt_transformers([u[0] for u in transcriptions], lang=lang)
+            context = self.metadata_transformers.transform(context)
             msg: Message = message.forward("recognizer_loop:utterance",
-                                           {"utterances": [u[0] for u in transcriptions],
-                                            "lang": self.stt.lang})
+                                           {"utterances": transcriptions, "lang": lang})
+            msg.context.update(context)
             super().handle_inject_mycroft_msg(msg, client)
         else:
             super().handle_inject_mycroft_msg(message, client)
 
 
 @click.command()
-@click.option('--wakeword', default="hey_mycroft",
-              help="Specify the wake word for the listener. Default is 'hey_mycroft'. config will be loaded from mycroft.conf.")
-@click.option('--stt-plugin', default=None,
-              help="Specify the STT plugin to use. If not provided, the default STT from mycroft.conf will be used.")
-@click.option('--tts-plugin', default=None,
-              help="Specify the TTS plugin to use. If not provided, the default TTS from mycroft.conf will be used.")
-@click.option('--vad-plugin', default=None,
-              help="Specify the VAD plugin to use. If not provided, the default VAD from mycroft.conf will be used.")
+@click.option('--wakeword', default="hey_mycroft", type=str,
+              help="Specify the wake word for the listener. Default is 'hey_mycroft'.")
+@click.option('--stt-plugin', default=None, type=str, help="Specify the STT plugin to use.")
+@click.option('--tts-plugin', default=None, type=str, help="Specify the TTS plugin to use.")
+@click.option('--vad-plugin', default=None, type=str, help="Specify the VAD plugin to use.")
+@click.option("--dialog-transformers", multiple=True, type=str,
+              help=f"dialog transformer plugins to load."
+                   f"Installed plugins: {DialogTransformersService.get_available_plugins() or None}")
+@click.option("--utterance-transformers", multiple=True, type=str,
+              help=f"utterance transformer plugins to load."
+                   f"Installed plugins: {UtteranceTransformersService.get_available_plugins() or None}")
+@click.option("--metadata-transformers", multiple=True, type=str,
+              help=f"metadata transformer plugins to load."
+                   f"Installed plugins: {MetadataTransformersService.get_available_plugins() or None}")
 @click.option("--ovos_bus_address", help="Open Voice OS bus address", type=str, default="127.0.0.1")
 @click.option("--ovos_bus_port", help="Open Voice OS bus port number", type=int, default=8181)
 @click.option("--host", help="HiveMind host", type=str, default="0.0.0.0")
@@ -430,6 +489,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
 @click.option("--redis-port", default=6379, help="[redis] Port for Redis. Default is 6379.")
 @click.option("--redis-password", required=False, help="[redis] Password for Redis. Default None")
 def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
+                          dialog_transformers, utterance_transformers, metadata_transformers,
                           ovos_bus_address: str, ovos_bus_port: int, host: str, port: int,
                           ssl: bool, cert_dir: str, cert_name: str,
                           db_backend, db_name, db_folder,
@@ -437,6 +497,10 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
                           ):
     """
     Run the HiveMind Listener with configurable plugins.
+
+    If a plugin is not specified, the defaults from mycroft.conf will be used.
+
+    mycroft.conf will be loaded as usual for plugin settings
     """
     kwargs = get_db_kwargs(db_backend, db_name, db_folder, redis_host, redis_port, redis_password)
     ovos_bus_config = {
@@ -453,11 +517,22 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
     }
 
     # Configure wakeword, TTS, STT, and VAD plugins
+    config = Configuration()
+    if stt_plugin:
+        config["stt"]["module"] = stt_plugin
+    if tts_plugin:
+        config["tts"]["module"] = tts_plugin
+    if vad_plugin:
+        config["listener"]["VAD"]["module"] = vad_plugin
+
     AudioReceiverProtocol.plugin_opts = PluginOptions(
         wakeword=wakeword,
-        stt=OVOSSTTFactory.create(stt_plugin) if stt_plugin else OVOSSTTFactory.create(),
-        tts=OVOSTTSFactory.create(tts_plugin) if tts_plugin else OVOSTTSFactory.create(),
-        vad=OVOSVADFactory.create(vad_plugin) if vad_plugin else OVOSVADFactory.create()
+        stt=OVOSSTTFactory.create(config),
+        tts=OVOSTTSFactory.create(config),
+        vad=OVOSVADFactory.create(config),
+        dialog_transformers=dialog_transformers,
+        utterance_transformers=utterance_transformers,
+        metadata_transformers=metadata_transformers
     )
 
     # Start the service
