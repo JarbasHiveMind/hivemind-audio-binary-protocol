@@ -421,7 +421,6 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             metadata = {"lang": lang,
                         "file_name": wav.split("/")[-1],
                         "utterance": message.data["utterance"]}
-            context = self.metadata_transformers.transform(context)
             metadata.update(context)
             payload = HiveMessage(HiveMessageType.BINARY,
                                   payload=bin_data,
