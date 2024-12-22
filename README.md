@@ -42,19 +42,22 @@ Usage: hivemind-listener [OPTIONS]
 
   Run the HiveMind Listener with configurable plugins.
 
+  If a plugin is not specified, the defaults from mycroft.conf will be used.
+
+  mycroft.conf will be loaded as usual for plugin settings
+
 Options:
   --wakeword TEXT                 Specify the wake word for the listener.
-                                  Default is 'hey_mycroft'. config will be
-                                  loaded from mycroft.conf.
-  --stt-plugin TEXT               Specify the STT plugin to use. If not
-                                  provided, the default STT from mycroft.conf
-                                  will be used.
-  --tts-plugin TEXT               Specify the TTS plugin to use. If not
-                                  provided, the default TTS from mycroft.conf
-                                  will be used.
-  --vad-plugin TEXT               Specify the VAD plugin to use. If not
-                                  provided, the default VAD from mycroft.conf
-                                  will be used.
+                                  Default is 'hey_mycroft'.
+  --stt-plugin TEXT               Specify the STT plugin to use.
+  --tts-plugin TEXT               Specify the TTS plugin to use.
+  --vad-plugin TEXT               Specify the VAD plugin to use.
+  --dialog-transformers TEXT      dialog transformer plugins to load.
+                                  Installed plugins: None
+  --utterance-transformers TEXT   utterance transformer plugins to load. 
+                                  Installed plugins: ['ovos-utterance-plugin-cancel']
+  --metadata-transformers TEXT    metadata transformer plugins to
+                                  load. Installed plugins: None
   --ovos_bus_address TEXT         Open Voice OS bus address
   --ovos_bus_port INTEGER         Open Voice OS bus port number
   --host TEXT                     HiveMind host
