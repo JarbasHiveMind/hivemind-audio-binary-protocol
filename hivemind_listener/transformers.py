@@ -13,12 +13,17 @@ from ovos_utils.log import LOG
 class DialogTransformersService:
     """ transform dialogs before being sent to TTS """
 
-    def __init__(self, bus, config=None):
+    def __init__(self, bus, enabled_plugins: List[str]):
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
         # to activate a plugin, just add an entry to mycroft.conf for it
-        self.config = config or Configuration().get("dialog_transformers", {})
+        config = Configuration().get("dialog_transformers", {})
+        if enabled_plugins:
+            for k in config:
+                if k not in enabled_plugins:
+                    config[k]["active"] = False
+        self.config = config
         self.load_plugins()
 
     @property
@@ -93,12 +98,16 @@ class DialogTransformersService:
 
 class UtteranceTransformersService:
 
-    def __init__(self, bus, config=None):
-        self.config_core = config or {}
+    def __init__(self, bus, enabled_plugins: List[str]):
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
-        self.config = self.config_core.get("utterance_transformers") or {}
+        config = Configuration().get("utterance_transformers") or {}
+        if enabled_plugins:
+            for k in config:
+                if k not in enabled_plugins:
+                    config[k]["active"] = False
+        self.config = config
         self.load_plugins()
 
     def load_plugins(self):
@@ -150,12 +159,16 @@ class UtteranceTransformersService:
 
 class MetadataTransformersService:
 
-    def __init__(self, bus, config=None):
-        self.config_core = config or {}
+    def __init__(self, bus, enabled_plugins: List[str]):
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
-        self.config = self.config_core.get("metadata_transformers") or {}
+        config = Configuration().get("metadata_transformers") or {}
+        if enabled_plugins:
+            for k in config:
+                if k not in enabled_plugins:
+                    config[k]["active"] = False
+        self.config = config
         self.load_plugins()
 
     def load_plugins(self):

@@ -13,7 +13,6 @@ import speech_recognition as sr
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.util import get_message_lang
-from ovos_config import Configuration
 from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
 from ovos_plugin_manager.templates.stt import STT
@@ -174,9 +173,9 @@ class PluginOptions:
     stt: STT = field(default_factory=OVOSSTTFactory.create)
     vad: VADEngine = field(default_factory=OVOSVADFactory.create)
     lang_detector: Optional[AudioLanguageDetector] = None  # TODO: Implement language detection.
-    utterance_transformers: Optional[UtteranceTransformersService] = None
-    metadata_transformers: Optional[MetadataTransformersService] = None
-    dialog_transformers: Optional[DialogTransformersService] = None
+    utterance_transformers: List[str] = field(default_factory=list)
+    metadata_transformers: List[str] = field(default_factory=list)
+    dialog_transformers: List[str] = field(default_factory=list)
 
 
 class AudioReceiverProtocol(HiveMindListenerProtocol):
@@ -185,13 +184,15 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
     """
     listeners: Dict[str, SimpleListener] = {}
     plugin_opts: PluginOptions = None
+    utterance_transformers: Optional[UtteranceTransformersService] = None
+    metadata_transformers: Optional[MetadataTransformersService] = None
+    dialog_transformers: Optional[DialogTransformersService] = None
 
     def bind(self, websocket, bus, identity, db: ClientDatabase):
         super().bind(websocket, bus, identity, db)
-        config = Configuration().get("hivemind", {})
-        self.plugin_opts.utterance_transformers = UtteranceTransformersService(bus, config=config)
-        self.plugin_opts.metadata_transformers = MetadataTransformersService(bus, config=config)
-        self.plugin_opts.dialog_transformers = DialogTransformersService(bus, config=config)
+        self.utterance_transformers = UtteranceTransformersService(bus, AudioReceiverProtocol.plugin_opts.utterance_transformers)
+        self.metadata_transformers = MetadataTransformersService(bus, AudioReceiverProtocol.plugin_opts.metadata_transformers)
+        self.dialog_transformers = DialogTransformersService(bus, AudioReceiverProtocol.plugin_opts.dialog_transformers)
 
     @property
     def plugins(self) -> PluginOptions:
@@ -267,7 +268,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         original = list(utterances)
         context = {}
         if utterances:
-            utterances, context = self.plugin_opts.utterance_transformers.transform(utterances, dict(lang=lang))
+            utterances, context = self.utterance_transformers.transform(utterances, dict(lang=lang))
             if original != utterances:
                 LOG.debug(f"utterances transformed: {original} -> {utterances}")
         return utterances, context
@@ -280,7 +281,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         original = utterance
         context = {}
         if utterance:
-            utterance, context = self.plugin_opts.dialog_transformers.transform(utterance, dict(lang=lang))
+            utterance, context = self.dialog_transformers.transform(utterance, dict(lang=lang))
             if original != utterance:
                 LOG.debug(f"speak transformed: {original} -> {utterance}")
         return utterance, context
@@ -390,7 +391,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
             utts, context = self._handle_utt_transformers(utts, lang)
-            context = self.plugin_opts.metadata_transformers.transform(context)
+            context = self.metadata_transformers.transform(context)
             m = Message("recognizer_loop:utterance",
                         {"utterances": utts, "lang": lang},
                         context=context)
@@ -417,7 +418,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             metadata = {"lang": lang,
                         "file_name": wav.split("/")[-1],
                         "utterance": message.data["utterance"]}
-            context = self.plugin_opts.metadata_transformers.transform(context)
+            context = self.metadata_transformers.transform(context)
             metadata.update(context)
             payload = HiveMessage(HiveMessageType.BINARY,
                                   payload=bin_data,
@@ -445,7 +446,7 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         elif message.msg_type == "recognizer_loop:b64_audio":
             transcriptions = self.transcribe_b64_audio(message)
             transcriptions, context = self._handle_utt_transformers([u[0] for u in transcriptions], lang=lang)
-            context = self.plugin_opts.metadata_transformers.transform(context)
+            context = self.metadata_transformers.transform(context)
             msg: Message = message.forward("recognizer_loop:utterance",
                                            {"utterances": transcriptions, "lang": lang})
             msg.context.update(context)
@@ -503,6 +504,7 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
     }
 
     # Configure wakeword, TTS, STT, and VAD plugins
+    # TODO - allow defining which transformer plugins to enable
     AudioReceiverProtocol.plugin_opts = PluginOptions(
         wakeword=wakeword,
         stt=OVOSSTTFactory.create(stt_plugin) if stt_plugin else OVOSSTTFactory.create(),
