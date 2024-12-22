@@ -17,14 +17,15 @@ class DialogTransformersService:
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
-        # to activate a plugin, just add an entry to mycroft.conf for it
-        config = Configuration().get("dialog_transformers", {})
-        if enabled_plugins:
-            for k in config:
-                if k not in enabled_plugins:
-                    config[k]["active"] = False
-        self.config = config
+        self.config = Configuration().get("dialog_transformers") or {}
+        if not enabled_plugins:
+            enabled_plugins = [k for k, v in self.config.items() if v.get("active", True)]
+        self.enabled_plugins = enabled_plugins
         self.load_plugins()
+
+    @staticmethod
+    def get_available_plugins() -> List[str]:
+        return list(find_dialog_transformer_plugins().keys())
 
     @property
     def blacklisted_skills(self):
@@ -35,7 +36,7 @@ class DialogTransformersService:
 
     def load_plugins(self):
         for plug_name, plug in find_dialog_transformer_plugins().items():
-            if plug_name in self.config:
+            if plug_name in self.enabled_plugins:
                 # if disabled skip it
                 if not self.config[plug_name].get("active", True):
                     continue
@@ -102,17 +103,19 @@ class UtteranceTransformersService:
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
-        config = Configuration().get("utterance_transformers") or {}
-        if enabled_plugins:
-            for k in config:
-                if k not in enabled_plugins:
-                    config[k]["active"] = False
-        self.config = config
+        self.config = Configuration().get("utterance_transformers") or {}
+        if not enabled_plugins:
+            enabled_plugins = [k for k, v in self.config.items() if v.get("active", True)]
+        self.enabled_plugins = enabled_plugins
         self.load_plugins()
+
+    @staticmethod
+    def get_available_plugins() -> List[str]:
+        return list(find_utterance_transformer_plugins().keys())
 
     def load_plugins(self):
         for plug_name, plug in find_utterance_transformer_plugins().items():
-            if plug_name in self.config:
+            if plug_name in self.enabled_plugins:
                 # if disabled skip it
                 if not self.config[plug_name].get("active", True):
                     continue
@@ -163,17 +166,19 @@ class MetadataTransformersService:
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
-        config = Configuration().get("metadata_transformers") or {}
-        if enabled_plugins:
-            for k in config:
-                if k not in enabled_plugins:
-                    config[k]["active"] = False
-        self.config = config
+        self.config = Configuration().get("metadata_transformers") or {}
+        if not enabled_plugins:
+            enabled_plugins = [k for k, v in self.config.items() if v.get("active", True)]
+        self.enabled_plugins = enabled_plugins
         self.load_plugins()
+
+    @staticmethod
+    def get_available_plugins() -> List[str]:
+        return list(find_metadata_transformer_plugins().keys())
 
     def load_plugins(self):
         for plug_name, plug in find_metadata_transformer_plugins().items():
-            if plug_name in self.config:
+            if plug_name in self.enabled_plugins:
                 # if disabled skip it
                 if not self.config[plug_name].get("active", True):
                     continue
