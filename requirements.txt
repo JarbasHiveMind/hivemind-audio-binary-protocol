@@ -3,3 +3,4 @@ hivemind_bus_client>=0.1.0,<1.0.0
 ovos-plugin-manager<1.0.0
 hivemind-core>=0.1.0,<1.0.0
 click
+pybase64
