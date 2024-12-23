@@ -1,7 +1,7 @@
-import base64
 import queue
 import subprocess
 import threading
+import time
 from dataclasses import dataclass, field
 from queue import Queue
 from shutil import which
@@ -9,6 +9,7 @@ from tempfile import NamedTemporaryFile
 from typing import Dict, List, Tuple, Optional, Union
 
 import click
+import pybase64
 import speech_recognition as sr
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -318,7 +319,12 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         # cast to str() to get a path, as it is a AudioFile object from tts cache
         with open(wav, "rb") as f:
             audio = f.read()
-        return base64.b64encode(audio).decode("utf-8")
+
+        s = time.monotonic()
+        encoded = pybase64.b64encode(audio).decode("utf-8")
+        LOG.debug(f"b64 encoding took: {time.monotonic() - s} seconds")
+
+        return encoded
 
     def transcribe_b64_audio(self, message: Optional[Message] = None) -> List[Tuple[str, float]]:
         """
@@ -332,7 +338,11 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
         """
         b64audio = message.data["audio"]
         lang = message.data.get("lang", self.plugins.stt.lang)
-        wav_data = base64.b64decode(b64audio)
+
+        s = time.monotonic()
+        wav_data = pybase64.b64decode(b64audio)
+        LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
+
         audio = bytes2audiodata(wav_data)
         return self.plugins.stt.transcribe(audio, lang)
 
