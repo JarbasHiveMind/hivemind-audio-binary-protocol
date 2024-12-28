@@ -23,7 +23,6 @@ from ovos_plugin_manager.templates.vad import VADEngine
 from ovos_plugin_manager.tts import OVOSTTSFactory
 from ovos_plugin_manager.vad import OVOSVADFactory
 from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
-from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
@@ -33,6 +32,7 @@ from hivemind_listener.transformers import (DialogTransformersService,
                                             MetadataTransformersService,
                                             UtteranceTransformersService)
 from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol
+from ovos_simple_listener import SimpleListener, ListenerCallbacks
 
 
 def bytes2audiodata(data: bytes) -> sr.AudioData:
@@ -205,8 +205,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         self.agent_protocol.bus.on("speak:b64_audio", self.handle_speak_b64)
         self.agent_protocol.bus.on("speak:synth", self.handle_speak_synth)
 
-    @classmethod
-    def add_listener(cls, client: HiveMindClientConnection) -> None:
+    def add_listener(self, client: HiveMindClientConnection) -> None:
         """
         Create and start a new listener for a connected client.
 
@@ -223,18 +222,18 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             hm: HiveMessage = HiveMessage(HiveMessageType.BUS, payload=m)
             client.send(hm)  # forward listener messages to the client
             if m.msg_type == "recognizer_loop:utterance":
-                cls.hm_protocol.handle_message(hm, client)  # process it as if it came from the client
+                self.hm_protocol.handle_message(hm, client)  # process it as if it came from the client
 
         bus.on("message", on_msg)
 
-        cls.listeners[client.peer] = SimpleListener(
+        AudioBinaryProtocol.listeners[client.peer] = SimpleListener(
             mic=FakeMicrophone(),
-            vad=cls.plugins.vad,
-            wakeword=OVOSWakeWordFactory.create_hotword(cls.plugins.wakeword),  # TODO allow different per client
-            stt=cls.plugins.stt,
+            vad=self.plugins.vad,
+            wakeword=OVOSWakeWordFactory.create_hotword(self.plugins.wakeword),  # TODO allow different per client
+            stt=self.plugins.stt,
             callbacks=AudioCallbacks(bus)
         )
-        cls.listeners[client.peer].start()
+        AudioBinaryProtocol.listeners[client.peer].start()
 
     @classmethod
     def stop_listener(cls, client: HiveMindClientConnection) -> None:
@@ -249,9 +248,8 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             cls.listeners[client.peer].stop()
             cls.listeners.pop(client.peer)
 
-    @classmethod
     # helpers
-    def transform_utterances(cls, utterances: List[str], lang: str) -> Tuple[str, Dict]:
+    def transform_utterances(self, utterances: List[str], lang: str) -> Tuple[str, Dict]:
         """
         Pipe utterance through transformer plugins to get more metadata.
         Utterances may be modified by any parser and context overwritten
@@ -259,13 +257,12 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         original = list(utterances)
         context = {}
         if utterances:
-            utterances, context = cls.utterance_transformers.transform(utterances, dict(lang=lang))
+            utterances, context = self.utterance_transformers.transform(utterances, dict(lang=lang))
             if original != utterances:
                 LOG.debug(f"utterances transformed: {original} -> {utterances}")
         return utterances, context
 
-    @classmethod
-    def transform_dialogs(cls, utterance: str, lang: str) -> Tuple[str, Dict]:
+    def transform_dialogs(self, utterance: str, lang: str) -> Tuple[str, Dict]:
         """
         Pipe utterance through transformer plugins to get more metadata.
         Utterances may be modified by any parser and context overwritten
@@ -273,13 +270,12 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         original = utterance
         context = {}
         if utterance:
-            utterance, context = cls.dialog_transformers.transform(utterance, dict(lang=lang))
+            utterance, context = self.dialog_transformers.transform(utterance, dict(lang=lang))
             if original != utterance:
                 LOG.debug(f"speak transformed: {original} -> {utterance}")
         return utterance, context
 
-    @staticmethod
-    def get_tts(message: Optional[Message] = None) -> str:
+    def get_tts(self, message: Optional[Message] = None) -> str:
         """
         Generate TTS audio for the given utterance.
 
@@ -290,12 +286,11 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             str: Path to the generated audio file.
         """
         utterance = message.data['utterance']
-        ctxt = AudioBinaryProtocol.plugins.tts._get_ctxt({"message": message})
-        wav, _ = AudioBinaryProtocol.plugins.tts.synth(utterance, ctxt)
+        ctxt = self.plugins.tts._get_ctxt({"message": message})
+        wav, _ = self.plugins.tts.synth(utterance, ctxt)
         return str(wav)
 
-    @classmethod
-    def get_b64_tts(cls, message: Optional[Message] = None) -> str:
+    def get_b64_tts(self, message: Optional[Message] = None) -> str:
         """
         Generate TTS audio and return it as a Base64-encoded string.
 
@@ -305,7 +300,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         Returns:
             str: Base64-encoded TTS audio data.
         """
-        wav = cls.get_tts(message)
+        wav = self.get_tts(message)
         # cast to str() to get a path, as it is a AudioFile object from tts cache
         with open(wav, "rb") as f:
             audio = f.read()
@@ -316,8 +311,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
 
         return encoded
 
-    @staticmethod
-    def transcribe_b64_audio(message: Optional[Message] = None) -> List[Tuple[str, float]]:
+    def transcribe_b64_audio(self, message: Optional[Message] = None) -> List[Tuple[str, float]]:
         """
         Transcribe Base64-encoded audio data.
 
@@ -328,18 +322,17 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             List[Tuple[str, float]]: List of transcribed utterances with confidence scores.
         """
         b64audio = message.data["audio"]
-        lang = message.data.get("lang", AudioBinaryProtocol.plugins.stt.lang)
+        lang = message.data.get("lang", self.plugins.stt.lang)
 
         s = time.monotonic()
         wav_data = pybase64.b64decode(b64audio)
         LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
 
         audio = bytes2audiodata(wav_data)
-        return AudioBinaryProtocol.plugins.stt.transcribe(audio, lang)
+        return self.plugins.stt.transcribe(audio, lang)
 
     ###############
-    @classmethod
-    def handle_microphone_input(cls, bin_data: bytes, sample_rate: int, sample_width: int,
+    def handle_microphone_input(self, bin_data: bytes, sample_rate: int, sample_width: int,
                                 client: HiveMindClientConnection) -> None:
         """
         Handle binary audio data input from the microphone.
@@ -350,9 +343,9 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             sample_width (int): Sample width of the audio.
             client (HiveMindClientConnection): Connection object for the client sending the data.
         """
-        if client.peer not in cls.listeners:
-            cls.add_listener(client)
-        m: FakeMicrophone = cls.listeners[client.peer].mic
+        if client.peer not in self.listeners:
+            self.add_listener(client)
+        m: FakeMicrophone = self.listeners[client.peer].mic
         if m.sample_rate != sample_rate or m.sample_width != sample_width:
             LOG.debug(f"Got {len(bin_data)} bytes of audio data from {client.peer}")
             LOG.error(f"Sample rate/width mismatch! Got: ({sample_rate}, {sample_width}), "
@@ -361,8 +354,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         else:
             m.queue.put(bin_data)
 
-    @classmethod
-    def handle_stt_transcribe_request(cls, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
+    def handle_stt_transcribe_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
                                       client: HiveMindClientConnection) -> None:
         """
         Handle STT transcription request from binary audio data.
@@ -376,12 +368,11 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
         audio = sr.AudioData(bin_data, sample_rate, sample_width)
-        tx = cls.plugins.stt.transcribe(audio, lang)
+        tx = self.plugins.stt.transcribe(audio, lang)
         m = Message("recognizer_loop:transcribe.response", {"transcriptions": tx, "lang": lang})
         client.send(HiveMessage(HiveMessageType.BUS, payload=m))
 
-    @classmethod
-    def handle_stt_handle_request(cls, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
+    def handle_stt_handle_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
                                   client: HiveMindClientConnection) -> None:
         """
         Handle STT utterance transcription and injection into the message bus.
@@ -395,62 +386,58 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
         audio = sr.AudioData(bin_data, sample_rate, sample_width)
-        tx = cls.plugins.stt.transcribe(audio, lang)
+        tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
-            utts, context = cls.transform_utterances(utts, lang)
-            context = cls.metadata_transformers.transform(context)
+            utts, context = self.transform_utterances(utts, lang)
+            context = self.metadata_transformers.transform(context)
             m = Message("recognizer_loop:utterance",
                         {"utterances": utts, "lang": lang},
                         context=context)
-            cls.hm_protocol.handle_inject_agent_msg(m, client)
+            self.hm_protocol.handle_inject_agent_msg(m, client)
         else:
             LOG.info(f"STT transcription error for client: {client.peer}")
             m = Message("recognizer_loop:speech.recognition.unknown")
             client.send(HiveMessage(HiveMessageType.BUS, payload=m))
 
-    @classmethod
-    def handle_audio_b64(cls, message: Message):
+    def handle_audio_b64(self, message: Message):
         lang = get_message_lang(message)
-        transcriptions = AudioBinaryProtocol.transcribe_b64_audio(message)
-        transcriptions, context = AudioBinaryProtocol.transform_utterances([u[0] for u in transcriptions], lang=lang)
-        context = AudioBinaryProtocol.metadata_transformers.transform(context)
+        transcriptions = self.transcribe_b64_audio(message)
+        transcriptions, context = self.transform_utterances([u[0] for u in transcriptions], lang=lang)
+        context = self.metadata_transformers.transform(context)
         msg: Message = message.forward("recognizer_loop:utterance",
                                        {"utterances": transcriptions, "lang": lang})
         msg.context.update(context)
-        cls.hm_protocol.agent_protocol.bus.emit(msg)
+        self.hm_protocol.agent_protocol.bus.emit(msg)
 
-    @classmethod
-    def handle_transcribe_b64(cls, message: Message):
+    def handle_transcribe_b64(self, message: Message):
         lang = get_message_lang(message)
-        client = cls.hm_protocol.clients[message.context["source"]]
+        client = self.hm_protocol.clients[message.context["source"]]
         msg: Message = message.reply("recognizer_loop:b64_transcribe.response",
                                      {"lang": lang})
-        msg.data["transcriptions"] = AudioBinaryProtocol.transcribe_b64_audio(message)
+        msg.data["transcriptions"] = self.transcribe_b64_audio(message)
         if msg.context.get("destination") is None:
             msg.context["destination"] = "skills"  # ensure not treated as a broadcast
         payload = HiveMessage(HiveMessageType.BUS, msg)
 
         client.send(payload)
 
-    @classmethod
-    def handle_speak_b64(cls, message: Message):
-        client = cls.hm_protocol.clients[message.context["source"]]
+    def handle_speak_b64(self, message: Message):
+        client = self.hm_protocol.clients[message.context["source"]]
 
         msg: Message = message.reply("speak:b64_audio.response", message.data)
-        msg.data["audio"] = AudioBinaryProtocol.get_b64_tts(message)
+        msg.data["audio"] = self.get_b64_tts(message)
         if msg.context.get("destination") is None:
             msg.context["destination"] = "audio"  # ensure not treated as a broadcast
         payload = HiveMessage(HiveMessageType.BUS, msg)
         client.send(payload)
 
-    @classmethod
-    def handle_speak_synth(cls, message: Message):
-        client = cls.hm_protocol.clients[message.context["source"]]
+    def handle_speak_synth(self, message: Message):
+        client = self.hm_protocol.clients[message.context["source"]]
         lang = get_message_lang(message)
 
-        message.data["utterance"], context = AudioBinaryProtocol.transform_dialogs(message.data["utterance"], lang)
-        wav = AudioBinaryProtocol.get_tts(message)
+        message.data["utterance"], context = self.transform_dialogs(message.data["utterance"], lang)
+        wav = self.get_tts(message)
         with open(wav, "rb") as f:
             bin_data = f.read()
         metadata = {"lang": lang,
