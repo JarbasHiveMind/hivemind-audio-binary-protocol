@@ -28,11 +28,11 @@ from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
 from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
-from hivemind_core.agents import OVOSProtocol
-from hivemind_core.protocol import HiveMindListenerProtocol, HiveMindClientConnection
+from hivemind_core.protocol import HiveMindClientConnection
 from hivemind_listener.transformers import (DialogTransformersService,
                                             MetadataTransformersService,
                                             UtteranceTransformersService)
+from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol
 
 
 def bytes2audiodata(data: bytes) -> sr.AudioData:
@@ -64,7 +64,7 @@ def bytes2audiodata(data: bytes) -> sr.AudioData:
     return audio
 
 
-class HMCallbacks(ListenerCallbacks):
+class AudioCallbacks(ListenerCallbacks):
     """
     Callbacks for handling various stages of audio recognition
     """
@@ -176,7 +176,8 @@ class PluginOptions:
     dialog_transformers: List[str] = field(default_factory=list)
 
 
-class AudioBinaryProtocol:
+@dataclass
+class AudioBinaryProtocol(BinaryDataHandlerProtocol):
     """wrapper for encapsulating logic for handling incoming binary data"""
     plugins: Optional[PluginOptions] = None
     utterance_transformers: Optional[UtteranceTransformersService] = None
@@ -185,6 +186,28 @@ class AudioBinaryProtocol:
 
     hm_protocol: Optional['AudioReceiverProtocol'] = None
     listeners = {}
+
+    def __post_init__(self):
+        if self.plugins is None:
+            self.plugins = PluginOptions()
+        if self.utterance_transformers is None:
+            self.utterance_transformers = UtteranceTransformersService(
+                self.agent_protocol.bus, self.plugins.utterance_transformers)
+        if self.dialog_transformers is None:
+            self.dialog_transformers = DialogTransformersService(
+                self.agent_protocol.bus, self.plugins.dialog_transformers)
+        if self.metadata_transformers is None:
+            self.metadata_transformers = MetadataTransformersService(
+                self.agent_protocol.bus, self.plugins.metadata_transformers)
+        # agent protocol payloads with binary audio results
+        self.agent_protocol.bus.on("recognizer_loop:b64_audio", self.handle_audio_b64)
+        self.agent_protocol.bus.on("recognizer_loop:b64_transcribe", self.handle_transcribe_b64)
+        self.agent_protocol.bus.on("speak:b64_audio", self.handle_speak_b64)
+        self.agent_protocol.bus.on("speak:synth", self.handle_speak_synth)
+
+        if self.hm_protocol:
+            # TODO - this needs to be a kwarg to hm_protocol
+            self.hm_protocol.disconnect_client_callback = self.stop_listener
 
     @classmethod
     def add_listener(cls, client: HiveMindClientConnection) -> None:
@@ -213,7 +236,7 @@ class AudioBinaryProtocol:
             vad=cls.plugins.vad,
             wakeword=OVOSWakeWordFactory.create_hotword(cls.plugins.wakeword),  # TODO allow different per client
             stt=cls.plugins.stt,
-            callbacks=HMCallbacks(bus)
+            callbacks=AudioCallbacks(bus)
         )
         cls.listeners[client.peer].start()
 
@@ -443,42 +466,3 @@ class AudioBinaryProtocol:
                               metadata=metadata,
                               bin_type=HiveMindBinaryPayloadType.TTS_AUDIO)
         client.send(payload)
-
-
-class AudioReceiverProtocol(HiveMindListenerProtocol):
-    def __post_init__(self):
-        AudioBinaryProtocol.hm_protocol = self
-        if AudioBinaryProtocol.plugins is None:
-            AudioBinaryProtocol.plugins = PluginOptions()
-        if AudioBinaryProtocol.utterance_transformers is None:
-            AudioBinaryProtocol.utterance_transformers = UtteranceTransformersService(
-                self.agent_protocol.bus, AudioBinaryProtocol.plugins.utterance_transformers)
-        if AudioBinaryProtocol.dialog_transformers is None:
-            AudioBinaryProtocol.dialog_transformers = DialogTransformersService(
-                self.agent_protocol.bus, AudioBinaryProtocol.plugins.dialog_transformers)
-        if AudioBinaryProtocol.metadata_transformers is None:
-            AudioBinaryProtocol.metadata_transformers = MetadataTransformersService(
-                self.agent_protocol.bus, AudioBinaryProtocol.plugins.metadata_transformers)
-        # agent protocol payloads with binary audio results
-        self.agent_protocol.bus.on("recognizer_loop:b64_audio", AudioBinaryProtocol.handle_audio_b64)
-        self.agent_protocol.bus.on("recognizer_loop:b64_transcribe", AudioBinaryProtocol.handle_transcribe_b64)
-        self.agent_protocol.bus.on("speak:b64_audio", AudioBinaryProtocol.handle_speak_b64)
-        self.agent_protocol.bus.on("speak:synth", AudioBinaryProtocol.handle_speak_synth)
-
-    ########
-    # binary data protocol handlers
-    def handle_client_disconnected(self, client: HiveMindClientConnection) -> None:
-        super().handle_client_disconnected(client)
-        AudioBinaryProtocol.stop_listener(client)
-
-    def handle_microphone_input(self, bin_data: bytes, sample_rate: int, sample_width: int,
-                                client: HiveMindClientConnection) -> None:
-        AudioBinaryProtocol.handle_microphone_input(bin_data, sample_rate, sample_width, client)
-
-    def handle_stt_transcribe_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
-                                      client: HiveMindClientConnection) -> None:
-        AudioBinaryProtocol.handle_stt_transcribe_request(bin_data, sample_rate, sample_width, lang, client)
-
-    def handle_stt_handle_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
-                                  client: HiveMindClientConnection) -> None:
-        AudioBinaryProtocol.handle_stt_handle_request(bin_data, sample_rate, sample_width, lang, client)

@@ -7,10 +7,11 @@ from ovos_utils.xdg_utils import xdg_data_home
 
 from hivemind_core.database import ClientDatabase
 from hivemind_core.scripts import get_db_kwargs
-from hivemind_core.server import HiveMindWebsocketProtocol
+from hivemind_websocket_protocol import HiveMindWebsocketProtocol
 from hivemind_core.service import HiveMindService
-from hivemind_core.agents import OVOSProtocol
-from hivemind_listener.protocol import AudioReceiverProtocol, PluginOptions, AudioBinaryProtocol
+from hivemind_core.protocol import HiveMindListenerProtocol
+from ovos_bus_client.hpm import OVOSProtocol
+from hivemind_listener.protocol import PluginOptions, AudioBinaryProtocol
 from hivemind_listener.transformers import (DialogTransformersService,
                                             MetadataTransformersService,
                                             UtteranceTransformersService)
@@ -100,7 +101,8 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
                               agent_config=ovos_bus_config,
                               network_protocol=HiveMindWebsocketProtocol,
                               network_config=websocket_config,
-                              hm_protocol=AudioReceiverProtocol,
+                              hm_protocol=HiveMindListenerProtocol,
+                              binary_data_protocol=AudioBinaryProtocol,
                               db=ClientDatabase(**kwargs))
 
     service.run()
