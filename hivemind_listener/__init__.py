@@ -38,6 +38,8 @@ from hivemind_listener.transformers import (DialogTransformersService,
                                             MetadataTransformersService,
                                             UtteranceTransformersService)
 
+from hivemind_core.agents import OVOSProtocol
+from hivemind_core.server import HiveMindWebsocketProtocol
 
 def bytes2audiodata(data: bytes) -> sr.AudioData:
     """
@@ -190,8 +192,8 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
     metadata_transformers: Optional[MetadataTransformersService] = None
     dialog_transformers: Optional[DialogTransformersService] = None
 
-    def bind(self, websocket, bus, identity, db: ClientDatabase):
-        super().bind(websocket, bus, identity, db)
+    def bind(self, network_protocol, bus, identity, db: ClientDatabase):
+        super().bind(network_protocol, bus, identity, db)
         self.utterance_transformers = UtteranceTransformersService(bus,
                                                                    AudioReceiverProtocol.plugin_opts.utterance_transformers)
         self.metadata_transformers = MetadataTransformersService(bus,
@@ -408,13 +410,13 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             m = Message("recognizer_loop:utterance",
                         {"utterances": utts, "lang": lang},
                         context=context)
-            self.handle_inject_mycroft_msg(m, client)
+            self.handle_inject_agent_msg(m, client)
         else:
             LOG.info(f"STT transcription error for client: {client.peer}")
             m = Message("recognizer_loop:speech.recognition.unknown")
             client.send(HiveMessage(HiveMessageType.BUS, payload=m))
 
-    def handle_inject_mycroft_msg(self, message: Message, client: HiveMindClientConnection) -> None:
+    def handle_inject_agent_msg(self, message: Message, client: HiveMindClientConnection) -> None:
         """
         Handle injection of Mycroft bus messages into the HiveMind system.
 
@@ -462,9 +464,9 @@ class AudioReceiverProtocol(HiveMindListenerProtocol):
             msg: Message = message.forward("recognizer_loop:utterance",
                                            {"utterances": transcriptions, "lang": lang})
             msg.context.update(context)
-            super().handle_inject_mycroft_msg(msg, client)
+            super().handle_inject_agent_msg(msg, client)
         else:
-            super().handle_inject_mycroft_msg(message, client)
+            super().handle_inject_agent_msg(message, client)
 
 
 @click.command()
@@ -547,11 +549,13 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
 
     # Start the service
     click.echo(f"Starting HiveMind Listener with wakeword '{wakeword}'...")
-    service = HiveMindService(
-        ovos_bus_config=ovos_bus_config,
-        websocket_config=websocket_config,
-        db=ClientDatabase(**kwargs),
-        protocol=AudioReceiverProtocol)
+    service = HiveMindService(agent_protocol=OVOSProtocol,
+                              agent_config=ovos_bus_config,
+                              network_protocol=HiveMindWebsocketProtocol,
+                              network_config=websocket_config,
+                              hm_protocol=AudioReceiverProtocol,
+                              db=ClientDatabase(**kwargs))
+
     service.run()
 
 
