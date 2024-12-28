@@ -1,6 +1,11 @@
 ovos-simple-listener
 hivemind_bus_client>=0.1.0,<1.0.0
 ovos-plugin-manager<1.0.0
-hivemind-core>=1.0.0,<2.0.0
+hivemind-core>=2.0.0,<3.0.0
+hivemind-plugin-manager>=0.0.2,<1.0.0
+ovos-bus-client>=1.3.0,<2.0.0
 click
 pybase64
+
+# TODO - for backwards compat, will be removed in a future release
+hivemind-websocket-protocol>=0.0.1,<1.0.0
