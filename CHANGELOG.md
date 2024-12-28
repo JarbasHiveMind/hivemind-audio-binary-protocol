@@ -1,12 +1,12 @@
 # Changelog
 
-## [1.0.0a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/1.0.0a1) (2024-12-28)
+## [2.0.0a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/2.0.0a1) (2024-12-28)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.4.1...1.0.0a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/1.0.0...2.0.0a1)
 
-**Breaking changes:**
+**Merged pull requests:**
 
-- refactor: hivemind-core 1.0.0 modernize [\#19](https://github.com/JarbasHiveMind/hivemind-listener/pull/19) ([JarbasAl](https://github.com/JarbasAl))
+- feat!:hpm [\#21](https://github.com/JarbasHiveMind/hivemind-listener/pull/21) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
