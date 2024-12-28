@@ -205,10 +205,6 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         self.agent_protocol.bus.on("speak:b64_audio", self.handle_speak_b64)
         self.agent_protocol.bus.on("speak:synth", self.handle_speak_synth)
 
-        if self.hm_protocol:
-            # TODO - this needs to be a kwarg to hm_protocol
-            self.hm_protocol.disconnect_client_callback = self.stop_listener
-
     @classmethod
     def add_listener(cls, client: HiveMindClientConnection) -> None:
         """

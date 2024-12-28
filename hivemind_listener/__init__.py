@@ -9,7 +9,7 @@ from hivemind_core.database import ClientDatabase
 from hivemind_core.scripts import get_db_kwargs
 from hivemind_websocket_protocol import HiveMindWebsocketProtocol
 from hivemind_core.service import HiveMindService
-from hivemind_core.protocol import HiveMindListenerProtocol
+from hivemind_core.protocol import HiveMindListenerProtocol, ClientCallbacks
 from ovos_bus_client.hpm import OVOSProtocol
 from hivemind_listener.protocol import PluginOptions, AudioBinaryProtocol
 from hivemind_listener.transformers import (DialogTransformersService,
@@ -103,6 +103,7 @@ def run_hivemind_listener(wakeword, stt_plugin, tts_plugin, vad_plugin,
                               network_config=websocket_config,
                               hm_protocol=HiveMindListenerProtocol,
                               binary_data_protocol=AudioBinaryProtocol,
+                              callbacks=ClientCallbacks(on_disconnect=AudioBinaryProtocol.stop_listener),
                               db=ClientDatabase(**kwargs))
 
     service.run()
