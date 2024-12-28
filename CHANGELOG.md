@@ -1,16 +1,12 @@
 # Changelog
 
-## [0.4.1a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/0.4.1a1) (2024-12-23)
+## [1.0.0a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/1.0.0a1) (2024-12-28)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.4.0...0.4.1a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/0.4.1...1.0.0a1)
 
-**Implemented enhancements:**
+**Breaking changes:**
 
-- speed up b64 encode/decode [\#16](https://github.com/JarbasHiveMind/hivemind-listener/issues/16)
-
-**Merged pull requests:**
-
-- performance: speed up b64 operations [\#17](https://github.com/JarbasHiveMind/hivemind-listener/pull/17) ([JarbasAl](https://github.com/JarbasAl))
+- refactor: hivemind-core 1.0.0 modernize [\#19](https://github.com/JarbasHiveMind/hivemind-listener/pull/19) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
