@@ -6,7 +6,6 @@ BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_version():
     """Find the version of the package"""
-    version = None
     version_file = os.path.join(BASEDIR, "hivemind_listener", "version.py")
     major, minor, build, alpha = (None, None, None, None)
     with open(version_file) as f:
@@ -39,6 +38,7 @@ def required(requirements_file):
             ]
         return [pkg for pkg in requirements if pkg.strip() and not pkg.startswith("#")]
 
+PLUGIN_ENTRY_POINT = 'hivemind-audio-binary-protocol-plugin=hivemind_listener.protocol:AudioBinaryProtocol'
 
 setup(
     name="hivemind-listener",
@@ -52,6 +52,6 @@ setup(
     author_email="jarbasai@mailfence.com",
     description="Mesh Networking utilities for OpenVoiceOS",
     entry_points={
-        "console_scripts": ["hivemind-listener=hivemind_listener:run_hivemind_listener"]
-    },
+        'hivemind.binary.protocol': PLUGIN_ENTRY_POINT
+    }
 )

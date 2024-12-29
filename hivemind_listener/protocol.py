@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from queue import Queue
 from shutil import which
 from tempfile import NamedTemporaryFile
-from typing import Dict
-from typing import List, Tuple, Optional, Union
+from typing import Dict, Any, List, Tuple, Optional, Union
 
 import pybase64
 import speech_recognition as sr
@@ -23,6 +22,7 @@ from ovos_plugin_manager.templates.vad import VADEngine
 from ovos_plugin_manager.tts import OVOSTTSFactory
 from ovos_plugin_manager.vad import OVOSVADFactory
 from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
+from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
@@ -31,8 +31,7 @@ from hivemind_core.protocol import HiveMindClientConnection
 from hivemind_listener.transformers import (DialogTransformersService,
                                             MetadataTransformersService,
                                             UtteranceTransformersService)
-from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol
-from ovos_simple_listener import SimpleListener, ListenerCallbacks
+from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol, ClientCallbacks
 
 
 def bytes2audiodata(data: bytes) -> sr.AudioData:
@@ -183,13 +182,47 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
     utterance_transformers: Optional[UtteranceTransformersService] = None
     metadata_transformers: Optional[MetadataTransformersService] = None
     dialog_transformers: Optional[DialogTransformersService] = None
-
+    config: Dict[str, Any] = field(default_factory=dict)
     hm_protocol: Optional['AudioReceiverProtocol'] = None
+    callbacks: Optional[ClientCallbacks] = None
     listeners = {}
 
     def __post_init__(self):
+        # Configure wakeword, TTS, STT, and VAD plugins
         if self.plugins is None:
-            self.plugins = PluginOptions()
+
+            if not self.config:
+                LOG.warning("No config passed to AudioBinaryProtocol, "
+                            "reading mycroft.conf to select plugins")
+                # use regular mycroft.conf
+                from ovos_config import Configuration
+                config = Configuration()
+                self.config["stt"] = config["stt"]
+                self.config["tts"] = config["tts"]
+                self.config["vad"] = config["listener"]["VAD"]
+                self.config["wakeword"] = config["listener"]["wake_word"]
+                self.config["hotwords"] = config["hotwords"]
+                self.config["utterance_transformers"] = list(config.get("utterance_transformers", {}))
+                self.config["dialog_transformers"] = list(config.get("dialog_transformers", {}))
+                self.config["metadata_transformers"] = list(config.get("metadata_transformers", {}))
+
+            LOG.debug(f"Loading STT '{self.config['stt']['module']}': {self.config['stt']}")
+            stt = OVOSSTTFactory.create(self.config["stt"])
+            LOG.debug(f"Loading TTS '{self.config['tts']['module']}': {self.config['tts']}")
+            tts = OVOSTTSFactory.create(self.config["tts"])
+            LOG.debug(f"Loading VAD '{self.config['vad']['module']}': {self.config['vad']}")
+            vad = OVOSVADFactory.create(self.config["vad"])
+
+            self.plugins = PluginOptions(
+                wakeword=self.config["wakeword"],  # TODO - allow per client
+                stt=stt,
+                tts=tts,
+                vad=vad,
+                dialog_transformers=self.config.get("dialog_transformers", []),
+                utterance_transformers=self.config.get("utterance_transformers", []),
+                metadata_transformers=self.config.get("metadata_transformers", [])
+            )
+
         if self.utterance_transformers is None:
             self.utterance_transformers = UtteranceTransformersService(
                 self.agent_protocol.bus, self.plugins.utterance_transformers)
@@ -199,6 +232,23 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         if self.metadata_transformers is None:
             self.metadata_transformers = MetadataTransformersService(
                 self.agent_protocol.bus, self.plugins.metadata_transformers)
+
+        # ensure client audio listener is closed when client disconnects
+        if not self.callbacks:
+            self.callbacks = ClientCallbacks(on_disconnect=AudioBinaryProtocol.stop_listener)
+        else:
+            original = self.callbacks.on_disconnect
+
+            def wrapper(c):
+                try:
+                    original(c)
+                except:
+                    raise
+                finally:
+                    AudioBinaryProtocol.stop_listener(c)
+
+            self.callbacks.on_disconnect = wrapper
+
         # agent protocol payloads with binary audio results
         self.agent_protocol.bus.on("recognizer_loop:b64_audio", self.handle_audio_b64)
         self.agent_protocol.bus.on("recognizer_loop:b64_transcribe", self.handle_transcribe_b64)
@@ -226,10 +276,14 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
 
         bus.on("message", on_msg)
 
+        # TODO allow different per client
+        ww_cfg = self.config["hotwords"][self.plugins.wakeword]
+        LOG.debug(f"Loading client Wake Word '{self.plugins.wakeword}': {ww_cfg}")
+
         AudioBinaryProtocol.listeners[client.peer] = SimpleListener(
             mic=FakeMicrophone(),
             vad=self.plugins.vad,
-            wakeword=OVOSWakeWordFactory.create_hotword(self.plugins.wakeword),  # TODO allow different per client
+            wakeword=OVOSWakeWordFactory.create_hotword(self.plugins.wakeword, self.config["hotwords"]),
             stt=self.plugins.stt,
             callbacks=AudioCallbacks(bus)
         )
