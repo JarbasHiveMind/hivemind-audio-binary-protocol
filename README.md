@@ -32,6 +32,29 @@ Extends [hivemind-core](https://github.com/JarbasHiveMind/hivemind-core) and int
 pip install hivemind-audio-binary-protocol
 ```
 
+## Configuration
+
+In your hivemind `server.json` set `"binary_protocol"` module to `"hivemind-audio-binary-protocol-plugin"` and configure the plugins to be used like you would in OVOS
+
+```json
+  "binary_protocol": {"module": "hivemind-audio-binary-protocol-plugin",
+                      "hivemind-audio-binary-protocol-plugin": {
+                          "stt": {"module": "XXX-plugin", "XXX-plugin":{}},
+                          "tts": {"module": "XXX-plugin", "XXX-plugin":{}},
+                          "vad": {"module": "XXX-plugin", "XXX-plugin":{}},
+                          "wake_word": "hey_mycroft",
+                          "hotwords": {
+                              "hey_mycroft": {
+                                  "module": "ovos-ww-plugin-precise-lite",
+                                  "model": "https://github.com/OpenVoiceOS/precise-lite-models/raw/master/wakewords/en/hey_mycroft.tflite"
+                              }
+                          }
+                      }},
+```
+
+If installed and configured correctly the audio binary protocol will be used when you run `hivemind-core listen`
+
+
 ---
 
 ## 🌐 Example Use Cases
