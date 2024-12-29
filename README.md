@@ -34,7 +34,11 @@ pip install hivemind-audio-binary-protocol
 
 ## Configuration
 
-In your hivemind `server.json` set `"binary_protocol"` module to `"hivemind-audio-binary-protocol-plugin"` and configure the plugins to be used like you would in OVOS
+In your hivemind `server.json` set `"binary_protocol"` module to `"hivemind-audio-binary-protocol-plugin"`. 
+
+> 💡 `server.json` documentation [here](https://github.com/JarbasHiveMind/HiveMind-core?tab=readme-ov-file#protocol-configuration)
+
+configure the plugins to be used like you would in OVOS
 
 ```json
   "binary_protocol": {"module": "hivemind-audio-binary-protocol-plugin",
