@@ -212,9 +212,10 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             tts = OVOSTTSFactory.create(self.config["tts"])
             LOG.debug(f"Loading VAD '{self.config['vad']['module']}': {self.config['vad']}")
             vad = OVOSVADFactory.create(self.config["vad"])
-
+            ww = self.config.get("wakeword") or self.config.get("wake_word") # backwards compat
+          
             self.plugins = PluginOptions(
-                wakeword=self.config["wakeword"],  # TODO - allow per client
+                wakeword=ww,  # TODO - allow per client
                 stt=stt,
                 tts=tts,
                 vad=vad,
