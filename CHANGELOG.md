@@ -1,12 +1,12 @@
 # Changelog
 
-## [3.0.0a1](https://github.com/JarbasHiveMind/hivemind-listener/tree/3.0.0a1) (2024-12-29)
+## [2.1.2a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.2a1) (2025-04-14)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-listener/compare/2.0.0...3.0.0a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.1...2.1.2a1)
 
-**Breaking changes:**
+**Merged pull requests:**
 
-- refactor!: provide protocol plugin only [\#23](https://github.com/JarbasHiveMind/hivemind-listener/pull/23) ([JarbasAl](https://github.com/JarbasAl))
+- fix: wakeword key [\#25](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/25) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
