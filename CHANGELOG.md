@@ -1,12 +1,12 @@
 # Changelog
 
-## [2.1.2a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.2a1) (2025-04-14)
+## [2.1.3a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.3a1) (2025-12-14)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.1...2.1.2a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.2...2.1.3a1)
 
 **Merged pull requests:**
 
-- fix: wakeword key [\#25](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/25) ([JarbasAl](https://github.com/JarbasAl))
+- Update ovos-plugin-manager version constraint [\#27](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/27) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
