@@ -1,12 +1,12 @@
 # Changelog
 
-## [2.1.3a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.3a1) (2025-12-14)
+## [2.1.4a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.4a1) (2025-12-18)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.2...2.1.3a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.3...2.1.4a1)
 
 **Merged pull requests:**
 
-- Update ovos-plugin-manager version constraint [\#27](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/27) ([JarbasAl](https://github.com/JarbasAl))
+- chore: Configure Renovate [\#29](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/29) ([renovate[bot]](https://github.com/apps/renovate))
 
 
 
