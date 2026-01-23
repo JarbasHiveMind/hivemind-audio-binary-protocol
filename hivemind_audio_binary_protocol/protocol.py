@@ -1,17 +1,17 @@
 import queue
-import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
 from queue import Queue
-from shutil import which
-from tempfile import NamedTemporaryFile
 from typing import Dict, Any, List, Tuple, Optional, Union
 
 import pybase64
-import speech_recognition as sr
+from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
+from hivemind_core.protocol import HiveMindClientConnection
+from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol, ClientCallbacks
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.message import Message
+from ovos_bus_client.session import Session
 from ovos_bus_client.util import get_message_lang
 from ovos_plugin_manager.stt import OVOSSTTFactory
 from ovos_plugin_manager.templates.microphone import Microphone
@@ -20,47 +20,16 @@ from ovos_plugin_manager.templates.transformers import AudioLanguageDetector
 from ovos_plugin_manager.templates.tts import TTS
 from ovos_plugin_manager.templates.vad import VADEngine
 from ovos_plugin_manager.tts import OVOSTTSFactory
+from ovos_plugin_manager.utils.audio import AudioData
 from ovos_plugin_manager.vad import OVOSVADFactory
 from ovos_plugin_manager.wakewords import OVOSWakeWordFactory
 from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
-from hivemind_bus_client.message import HiveMessage, HiveMessageType, HiveMindBinaryPayloadType
-from hivemind_core.protocol import HiveMindClientConnection
 from hivemind_audio_binary_protocol.transformers import (DialogTransformersService,
                                                          MetadataTransformersService,
                                                          UtteranceTransformersService)
-from hivemind_plugin_manager.protocols import BinaryDataHandlerProtocol, ClientCallbacks
-
-
-def bytes2audiodata(data: bytes) -> sr.AudioData:
-    """
-    Convert raw audio bytes into `speech_recognition.AudioData`.
-
-    Args:
-        data: Raw audio bytes.
-
-    Returns:
-        An AudioData object representing the audio data.
-    """
-    recognizer = sr.Recognizer()
-    with NamedTemporaryFile() as fp:
-        fp.write(data)
-        ffmpeg = which("ffmpeg")
-        if ffmpeg:
-            p = fp.name + "converted.wav"
-            # ensure file format
-            cmd = [ffmpeg, "-i", fp.name, "-acodec", "pcm_s16le", "-ar",
-                   "16000", "-ac", "1", "-f", "wav", p, "-y"]
-            subprocess.call(cmd)
-        else:
-            LOG.warning("ffmpeg not found, please ensure audio is in a valid format")
-            p = fp.name
-
-        with sr.AudioFile(p) as source:
-            audio = recognizer.record(source)
-    return audio
 
 
 class AudioCallbacks(ListenerCallbacks):
@@ -75,7 +44,7 @@ class AudioCallbacks(ListenerCallbacks):
         Args:
             bus: The message bus client or a FakeBus for testing.
         """
-        self.bus = bus or FakeBus()
+        self.bus = bus or FakeBus(session=Session())
 
     def listen_callback(cls):
         """
@@ -94,7 +63,7 @@ class AudioCallbacks(ListenerCallbacks):
         LOG.info("New loop state: WAITING_WAKEWORD")
         cls.bus.emit(Message("recognizer_loop:record_end"))
 
-    def error_callback(cls, audio: sr.AudioData):
+    def error_callback(cls, audio: AudioData):
         """
         Callback triggered when an error occurs during STT processing.
 
@@ -264,7 +233,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             client: The HiveMind client connection.
         """
         LOG.info(f"Creating listener for peer: {client.peer}")
-        bus = FakeBus()
+        bus = FakeBus(session=client.sess)
         bus.connected_event = threading.Event()  # TODO missing in FakeBus
         bus.connected_event.set()
 
@@ -378,12 +347,14 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         """
         b64audio = message.data["audio"]
         lang = message.data.get("lang", self.plugins.stt.lang)
+        sample_rate = message.data.get("sample_rate", 16000)
+        sample_width = message.data.get("sample_width", 2)
 
         s = time.monotonic()
         wav_data = pybase64.b64decode(b64audio)
         LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
 
-        audio = bytes2audiodata(wav_data)
+        audio = AudioData(wav_data, sample_rate, sample_width)
         return self.plugins.stt.transcribe(audio, lang)
 
     ###############
@@ -422,7 +393,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             client (HiveMindClientConnection): Connection object for the client sending the data.
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
-        audio = sr.AudioData(bin_data, sample_rate, sample_width)
+        audio = AudioData(bin_data, sample_rate, sample_width)
         tx = self.plugins.stt.transcribe(audio, lang)
         m = Message("recognizer_loop:transcribe.response", {"transcriptions": tx, "lang": lang})
         client.send(HiveMessage(HiveMessageType.BUS, payload=m))
@@ -440,7 +411,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             client (HiveMindClientConnection): Connection object for the client sending the data.
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
-        audio = sr.AudioData(bin_data, sample_rate, sample_width)
+        audio = AudioData(bin_data, sample_rate, sample_width)
         tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
