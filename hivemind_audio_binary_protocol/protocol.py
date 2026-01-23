@@ -391,19 +391,19 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
     def handle_stt_transcribe_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
                                       client: HiveMindClientConnection) -> None:
         """
-                                      Transcribe binary audio and send a transcription response to the client.
-                                      
-                                      Construct an AudioData object from the provided bytes, run the configured STT engine,
-                                      and emit a "recognizer_loop:transcribe.response" message containing the transcriptions
-                                      and language to the specified client.
-                                      
-                                      Parameters:
-                                          bin_data (bytes): Raw PCM/WAV audio bytes to transcribe.
-                                          sample_rate (int): Sample rate used to interpret the audio bytes.
-                                          sample_width (int): Sample width (bytes per sample) used to interpret the audio bytes.
-                                          lang (str): Language code to pass to the STT engine.
-                                          client (HiveMindClientConnection): Connection to send the transcription response to.
-                                      """
+        Transcribe binary audio and send a transcription response to the client.
+        
+        Construct an AudioData object from the provided bytes, run the configured STT engine,
+        and emit a "recognizer_loop:transcribe.response" message containing the transcriptions
+        and language to the specified client.
+        
+        Parameters:
+            bin_data (bytes): Raw PCM/WAV audio bytes to transcribe.
+            sample_rate (int): Sample rate used to interpret the audio bytes.
+            sample_width (int): Sample width (bytes per sample) used to interpret the audio bytes.
+            lang (str): Language code to pass to the STT engine.
+            client (HiveMindClientConnection): Connection to send the transcription response to.
+        """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
         audio = AudioData(bin_data, sample_rate, sample_width)
         tx = self.plugins.stt.transcribe(audio, lang)
