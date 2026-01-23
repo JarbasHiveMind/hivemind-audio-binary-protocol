@@ -39,16 +39,18 @@ class AudioCallbacks(ListenerCallbacks):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None) -> None:
         """
-        Initialize the HiveMind Callbacks.
-
-        Args:
-            bus: The message bus client or a FakeBus for testing.
+        Initialize AudioCallbacks with an optional message bus.
+        
+        Parameters:
+            bus: Message bus client used to emit and receive messages. If omitted, a FakeBus bound to a new Session is created for testing or isolated use.
         """
         self.bus = bus or FakeBus(session=Session())
 
     def listen_callback(cls):
         """
-        Callback triggered when listening starts.
+        Signal the start of a listening session and emit bus events to begin recording.
+        
+        Emits a "mycroft.audio.play_sound" message to play the start-listening sound, a "recognizer_loop:wakeword" event, and a "recognizer_loop:record_begin" event; also logs the state transition to IN_COMMAND.
         """
         LOG.info("New loop state: IN_COMMAND")
         cls.bus.emit(Message("mycroft.audio.play_sound",
@@ -58,17 +60,19 @@ class AudioCallbacks(ListenerCallbacks):
 
     def end_listen_callback(cls):
         """
-        Callback triggered when listening ends.
+        Signal that listening has ended and notify the message bus.
+        
+        Emits a "recognizer_loop:record_end" event on the instance bus and logs the transition to the WAITING_WAKEWORD state.
         """
         LOG.info("New loop state: WAITING_WAKEWORD")
         cls.bus.emit(Message("recognizer_loop:record_end"))
 
     def error_callback(cls, audio: AudioData):
         """
-        Callback triggered when an error occurs during STT processing.
-
-        Args:
-            audio: The audio data that caused the error.
+        Handle an STT error by emitting a speech recognition "unknown" event on the bus.
+        
+        Parameters:
+            audio (AudioData): The audio that failed transcription; provided for context but not returned.
         """
         LOG.error("STT Failure")
         cls.bus.emit(Message("recognizer_loop:speech.recognition.unknown"))
@@ -227,10 +231,14 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
 
     def add_listener(self, client: HiveMindClientConnection) -> None:
         """
-        Create and start a new listener for a connected client.
-
-        Args:
-            client: The HiveMind client connection.
+        Register and start a per-client audio listener and message forwarder.
+        
+        Sets up a FakeBus bound to the client's session, attaches a message handler that forwards listener events to the client and injects
+        "recognizer_loop:utterance" messages into the agent protocol, creates a SimpleListener using the configured plugins (mic, VAD,
+        wakeword, STT, callbacks), stores the listener in AudioBinaryProtocol.listeners under the client's peer, and starts it.
+        
+        Parameters:
+            client (HiveMindClientConnection): The HiveMind client connection to attach the listener to.
         """
         LOG.info(f"Creating listener for peer: {client.peer}")
         bus = FakeBus(session=client.sess)
@@ -383,14 +391,18 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
     def handle_stt_transcribe_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
                                       client: HiveMindClientConnection) -> None:
         """
-        Handle STT transcription request from binary audio data.
-
-        Args:
-            bin_data (bytes): Raw audio data.
-            sample_rate (int): Sample rate of the audio.
-            sample_width (int): Sample width of the audio.
-            lang (str): Language of the audio.
-            client (HiveMindClientConnection): Connection object for the client sending the data.
+        Transcribe binary audio and send a transcription response to the client.
+        
+        Construct an AudioData object from the provided bytes, run the configured STT engine,
+        and emit a "recognizer_loop:transcribe.response" message containing the transcriptions
+        and language to the specified client.
+        
+        Parameters:
+            bin_data (bytes): Raw PCM/WAV audio bytes to transcribe.
+            sample_rate (int): Sample rate used to interpret the audio bytes.
+            sample_width (int): Sample width (bytes per sample) used to interpret the audio bytes.
+            lang (str): Language code to pass to the STT engine.
+            client (HiveMindClientConnection): Connection to send the transcription response to.
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
         audio = AudioData(bin_data, sample_rate, sample_width)
