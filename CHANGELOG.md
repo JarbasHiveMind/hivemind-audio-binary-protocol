@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.5a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a1) (2026-01-23)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.4a1...2.1.5a1)
+
+**Merged pull requests:**
+
+- fix: keep session\_id [\#35](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/35) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.4a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.4a1) (2025-12-18)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.3...2.1.4a1)
