@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.5a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a3) (2026-03-04)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5a2...2.1.5a3)
+
+**Merged pull requests:**
+
+- chore\(deps\): update dependency hivemind-core to v4 [\#34](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/34) ([renovate[bot]](https://github.com/apps/renovate))
+
 ## [2.1.5a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a2) (2026-02-03)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5a1...2.1.5a2)
