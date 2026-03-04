@@ -1,12 +1,37 @@
 # Changelog
 
-## [2.1.3a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.3a1) (2025-12-14)
+## [2.1.5a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a3) (2026-03-04)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.2...2.1.3a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5a2...2.1.5a3)
 
 **Merged pull requests:**
 
-- Update ovos-plugin-manager version constraint [\#27](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/27) ([JarbasAl](https://github.com/JarbasAl))
+- chore\(deps\): update dependency hivemind-core to v4 [\#34](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/34) ([renovate[bot]](https://github.com/apps/renovate))
+
+## [2.1.5a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a2) (2026-02-03)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5a1...2.1.5a2)
+
+**Merged pull requests:**
+
+- chore\(deps\): update actions/setup-python action to v6 [\#33](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/33) ([renovate[bot]](https://github.com/apps/renovate))
+- chore\(deps\): update actions/checkout action to v6 [\#31](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/31) ([renovate[bot]](https://github.com/apps/renovate))
+
+## [2.1.5a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a1) (2026-01-23)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.4a1...2.1.5a1)
+
+**Merged pull requests:**
+
+- fix: keep session\_id [\#35](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/35) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.1.4a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.4a1) (2025-12-18)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.3...2.1.4a1)
+
+**Merged pull requests:**
+
+- chore: Configure Renovate [\#29](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/29) ([renovate[bot]](https://github.com/apps/renovate))
 
 
 
