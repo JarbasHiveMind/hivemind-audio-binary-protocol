@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.6a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a2) (2026-06-20)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a1...2.1.6a2)
+
+**Merged pull requests:**
+
+- build: modernize packaging \(pyproject\) + CI \(gh-automations\) [\#43](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/43) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.6a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a1) (2026-06-05)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5...2.1.6a1)
