@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hivemind-audio-binary-protocol"
+description = "Audio binary protocol for HiveMind"
+readme = "README.md"
+authors = [{ name = "jarbasAI", email = "jarbasai@mailfence.com" }]
+license = "Apache-2.0"
+requires-python = ">=3.10"
+keywords = ["hivemind", "audio", "binary", "protocol", "plugin"]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.entry-points."hivemind.binary.protocol"]
+"hivemind-audio-binary-protocol-plugin" = "hivemind_audio_binary_protocol.protocol:AudioBinaryProtocol"
+
+[tool.setuptools]
+packages = ["hivemind_audio_binary_protocol"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = { attr = "hivemind_audio_binary_protocol.version.__version__" }
+dependencies = { file = ["requirements.txt"] }
