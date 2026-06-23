@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.6a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a3) (2026-06-23)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a2...2.1.6a3)
+
+**Merged pull requests:**
+
+- test: add hivescope e2e binary audio suite [\#46](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/46) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.6a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a2) (2026-06-20)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a1...2.1.6a2)
