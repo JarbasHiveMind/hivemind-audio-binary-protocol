@@ -1,4 +1,7 @@
+import os
 import queue
+import shutil
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -27,8 +30,10 @@ from ovos_simple_listener import SimpleListener, ListenerCallbacks
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
-from hivemind_audio_binary_protocol.transformers import (DialogTransformersService,
+from hivemind_audio_binary_protocol.transformers import (AudioTransformersService,
+                                                         DialogTransformersService,
                                                          MetadataTransformersService,
+                                                         TTSTransformersService,
                                                          UtteranceTransformersService)
 
 
@@ -153,10 +158,12 @@ class PluginOptions:
     tts: TTS = field(default_factory=OVOSTTSFactory.create)
     stt: STT = field(default_factory=OVOSSTTFactory.create)
     vad: VADEngine = field(default_factory=OVOSVADFactory.create)
-    lang_detector: Optional[AudioLanguageDetector] = None  # TODO: Implement language detection.
+    lang_detector: Optional[AudioLanguageDetector] = None  # legacy; AudioLanguageDetector plugins now run in the audio_transformers chain
     utterance_transformers: List[str] = field(default_factory=list)
     metadata_transformers: List[str] = field(default_factory=list)
     dialog_transformers: List[str] = field(default_factory=list)
+    audio_transformers: List[str] = field(default_factory=list)
+    tts_transformers: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -166,6 +173,8 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
     utterance_transformers: Optional[UtteranceTransformersService] = None
     metadata_transformers: Optional[MetadataTransformersService] = None
     dialog_transformers: Optional[DialogTransformersService] = None
+    audio_transformers: Optional[AudioTransformersService] = None
+    tts_transformers: Optional[TTSTransformersService] = None
     config: Dict[str, Any] = field(default_factory=dict)
     hm_protocol: Optional['AudioReceiverProtocol'] = None
     callbacks: Optional[ClientCallbacks] = None
@@ -193,6 +202,8 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
                 self.config["utterance_transformers"] = list(config.get("utterance_transformers", {}))
                 self.config["dialog_transformers"] = list(config.get("dialog_transformers", {}))
                 self.config["metadata_transformers"] = list(config.get("metadata_transformers", {}))
+                self.config["audio_transformers"] = list(config.get("audio_transformers", {}))
+                self.config["tts_transformers"] = list(config.get("tts_transformers", {}))
 
             LOG.debug(f"Loading STT '{self.config['stt']['module']}': {self.config['stt']}")
             stt = OVOSSTTFactory.create(self.config["stt"])
@@ -209,7 +220,9 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
                 vad=vad,
                 dialog_transformers=self.config.get("dialog_transformers", []),
                 utterance_transformers=self.config.get("utterance_transformers", []),
-                metadata_transformers=self.config.get("metadata_transformers", [])
+                metadata_transformers=self.config.get("metadata_transformers", []),
+                audio_transformers=self.config.get("audio_transformers", []),
+                tts_transformers=self.config.get("tts_transformers", [])
             )
 
         if self.utterance_transformers is None:
@@ -221,6 +234,12 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         if self.metadata_transformers is None:
             self.metadata_transformers = MetadataTransformersService(
                 self.agent_protocol.bus, self.plugins.metadata_transformers)
+        if self.audio_transformers is None:
+            self.audio_transformers = AudioTransformersService(
+                self.agent_protocol.bus, self.plugins.audio_transformers)
+        if self.tts_transformers is None:
+            self.tts_transformers = TTSTransformersService(
+                self.agent_protocol.bus, self.plugins.tts_transformers)
 
         # ensure client audio listener is closed when client disconnects
         if not self.callbacks:
@@ -323,6 +342,31 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
                 LOG.debug(f"speak transformed: {original} -> {utterance}")
         return utterance, context
 
+    def transform_audio(self, audio: AudioData) -> Tuple[AudioData, Dict]:
+        """
+        Pipe audio through the audio transformer chain before the STT stage.
+        The returned context may carry e.g. stt_lang from an
+        AudioLanguageDetector plugin in the chain.
+        """
+        if not self.audio_transformers.plugins:
+            return audio, {}
+        chunk, context = self.audio_transformers.transform(audio.frame_data)
+        return AudioData(chunk, audio.sample_rate, audio.sample_width), context
+
+    def transform_tts_audio(self, wav: str) -> str:
+        """
+        Pipe a synthesized file through the tts transformer chain, operating
+        on a temp copy so the TTS plugin's audio cache is never mutated.
+        """
+        if not self.tts_transformers.plugins:
+            return wav
+        ext = os.path.splitext(wav)[1] or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+            tmp_path = f.name
+        shutil.copy(wav, tmp_path)
+        transformed, _ = self.tts_transformers.transform(tmp_path)
+        return transformed
+
     def get_tts(self, message: Optional[Message] = None) -> str:
         """
         Generate TTS audio for the given utterance.
@@ -336,7 +380,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         utterance = message.data['utterance']
         ctxt = self.plugins.tts._get_ctxt({"message": message})
         wav, _ = self.plugins.tts.synth(utterance, ctxt)
-        return str(wav)
+        return self.transform_tts_audio(str(wav))
 
     def get_b64_tts(self, message: Optional[Message] = None) -> str:
         """
@@ -379,6 +423,9 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
 
         audio = AudioData(wav_data, sample_rate, sample_width)
+        audio, context = self.transform_audio(audio)
+        if context.get("stt_lang") and not message.data.get("lang"):
+            lang = context["stt_lang"]
         return self.plugins.stt.transcribe(audio, lang)
 
     ###############
@@ -445,6 +492,9 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             self._reject_audio_format(sample_rate, sample_width, client)
             return
         audio = AudioData(bin_data, sample_rate, sample_width)
+        audio, context = self.transform_audio(audio)
+        if context.get("stt_lang") and not lang:
+            lang = context["stt_lang"]
         tx = self.plugins.stt.transcribe(audio, lang)
         m = Message("recognizer_loop:transcribe.response", {"transcriptions": tx, "lang": lang})
         client.send(HiveMessage(HiveMessageType.BUS, payload=m))
@@ -466,10 +516,14 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             self._reject_audio_format(sample_rate, sample_width, client)
             return
         audio = AudioData(bin_data, sample_rate, sample_width)
+        audio, audio_context = self.transform_audio(audio)
+        if audio_context.get("stt_lang") and not lang:
+            lang = audio_context["stt_lang"]
         tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
             utts = [t[0].rstrip(" '\"").lstrip(" '\"") for t in tx]
             utts, context = self.transform_utterances(utts, lang)
+            context = {**audio_context, **context}
             context = self.metadata_transformers.transform(context)
             m = Message("recognizer_loop:utterance",
                         {"utterances": utts, "lang": lang},

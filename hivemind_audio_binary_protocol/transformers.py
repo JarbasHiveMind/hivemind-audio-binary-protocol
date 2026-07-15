@@ -2,8 +2,10 @@ from typing import List, Optional
 
 from ovos_config import Configuration
 from ovos_plugin_manager.transformer_services import (
+    AudioTransformersService as _AudioTransformersService,
     DialogTransformersService as _DialogTransformersService,
     MetadataTransformersService as _MetadataTransformersService,
+    TTSTransformersService as _TTSTransformersService,
     UtteranceTransformersService as _UtteranceTransformersService)
 
 
@@ -47,4 +49,22 @@ class MetadataTransformersService(_MetadataTransformersService):
     def __init__(self, bus, enabled_plugins: Optional[List[str]] = None):
         super().__init__(bus=bus,
                          config=_section_config("metadata_transformers",
+                                                enabled_plugins))
+
+
+class AudioTransformersService(_AudioTransformersService):
+    """Transforms raw audio before the STT stage."""
+
+    def __init__(self, bus, enabled_plugins: Optional[List[str]] = None):
+        super().__init__(bus=bus,
+                         config=_section_config("audio_transformers",
+                                                enabled_plugins))
+
+
+class TTSTransformersService(_TTSTransformersService):
+    """Transforms synthesized audio after TTS."""
+
+    def __init__(self, bus, enabled_plugins: Optional[List[str]] = None):
+        super().__init__(bus=bus,
+                         config=_section_config("tts_transformers",
                                                 enabled_plugins))
