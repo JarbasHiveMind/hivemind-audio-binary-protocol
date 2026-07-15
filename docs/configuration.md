@@ -20,7 +20,9 @@ The plugin is configured under the `binary_protocol` key in
       },
       "utterance_transformers": [],
       "dialog_transformers":    [],
-      "metadata_transformers":  []
+      "metadata_transformers":  [],
+      "audio_transformers":     [],
+      "tts_transformers":       []
     }
   }
 }
@@ -38,6 +40,24 @@ The plugin is configured under the `binary_protocol` key in
 | `utterance_transformers` | List of OVOS utterance transformer plugin names to apply after STT. |
 | `dialog_transformers` | List of OVOS dialog transformer plugin names to apply before TTS. |
 | `metadata_transformers` | List of OVOS metadata transformer plugin names. |
+| `audio_transformers` | List of OVOS audio transformer plugin names applied before STT (an `AudioLanguageDetector` in the chain resolves a missing language). |
+| `tts_transformers` | List of OVOS tts transformer plugin names applied to synthesized audio (on a temp copy — the TTS cache is never mutated). |
+
+Per-plugin settings come from the deployer configuration (mycroft.conf)
+section of the same name; the lists here select which plugins are enabled.
+Chains run in ascending priority order (OVOS-TRANSFORM §4). See the
+[ovos-plugin-manager transformer docs](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/transformers.md)
+for the full contract.
+
+**When to use — and the surprise factor.** Transformers here run
+server-side for *every* thin satellite: an utterance transformer means the
+agent receives a different transcript than what the satellite's user said;
+a tts transformer means every satellite plays back post-processed audio.
+That is the tool for mesh-wide corrections, language auto-detection and a
+uniform audio character — with zero client changes. Per-device effects
+(denoise for one bad mic, a voice effect on one speaker) belong on the
+satellite instead. Never enable the same plugin on both the satellite and
+this server, or it is applied twice.
 
 ## Fallback to mycroft.conf
 
