@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.6a4](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a4) (2026-07-31)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a3...2.1.6a4)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#49](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/49) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.6a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a3) (2026-06-23)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a2...2.1.6a3)
