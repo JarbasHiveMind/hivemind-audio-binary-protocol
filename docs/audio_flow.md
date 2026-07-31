@@ -125,3 +125,6 @@ A client can also send `recognizer_loop:b64_audio` as a regular BUS message
 
 This path is used by clients that cannot send binary frames (e.g. HTTP transport
 clients or the Web UI).
+
+---
+[Home](../README.md) · [Configuration →](configuration.md)

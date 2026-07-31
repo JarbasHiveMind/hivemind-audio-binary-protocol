@@ -104,3 +104,6 @@ plugins. This mirrors the OVOS device configuration exactly.
   }
 }
 ```
+
+---
+[← Audio flow](audio_flow.md) · [Home](../README.md) · [Operations →](operations.md)

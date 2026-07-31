@@ -2,12 +2,9 @@
 
 Binary audio plugin for [hivemind-core](https://github.com/JarbasHiveMind/HiveMind-core).
 
-Adds server-side WakeWord detection, VAD, STT, and TTS to a hivemind-core hub so that
-lightweight satellites (e.g. [hivemind-mic-satellite](https://github.com/JarbasHiveMind/hivemind-mic-satellite))
-can stream raw audio and receive transcriptions or synthesised speech without running
-those models locally.
+The plugin adds server-side WakeWord detection, VAD, STT, and TTS to a hivemind-core hub. Lightweight satellites, such as [hivemind-mic-satellite](https://github.com/JarbasHiveMind/hivemind-mic-satellite), stream raw audio to the hub and receive transcriptions or synthesized speech. The satellites do not run those models locally.
 
-This plugin is the direct replacement for the old "HiveMind-listener" proof-of-concept.
+This plugin replaces the old "HiveMind-listener" proof-of-concept.
 
 ## Where it fits
 
@@ -76,16 +73,16 @@ hivemind-core listen
 
 ## Audio streaming modes
 
-This plugin handles three distinct binary audio flows:
+This plugin handles three binary audio flows:
 
 | Mode | Client sends | Hub returns | Use case |
 |---|---|---|---|
-| Microphone stream | Raw PCM audio chunks | Bus messages (wakeword/utterance events) | Mic satellite; hub does all pipeline processing |
-| STT transcription | Raw PCM audio | `recognizer_loop:transcribe.response` | Client wants transcription without triggering skills |
-| STT handle | Raw PCM audio | Triggers `recognizer_loop:utterance` on the bus | Client wants the hub to handle the utterance |
+| Microphone stream | Raw PCM audio chunks | Bus messages (wakeword/utterance events) | Mic satellite. The hub runs the full pipeline. |
+| STT transcription | Raw PCM audio | `recognizer_loop:transcribe.response` | Client wants a transcription without triggering skills. |
+| STT handle | Raw PCM audio | Triggers `recognizer_loop:utterance` on the bus | Client wants the hub to handle the utterance. |
 
-TTS is triggered by the bus (`speak:synth` or `speak:b64_audio`) and returns binary
-WAV audio or a Base64-encoded string back to the client.
+The bus triggers TTS (`speak:synth` or `speak:b64_audio`) and returns binary WAV audio
+or a Base64-encoded string to the client.
 
 ## Configuration reference
 
@@ -109,10 +106,20 @@ If the config block is omitted, the plugin falls back to reading `mycroft.conf`
 ## Access control
 
 This plugin respects hivemind-core's per-client `allowed_types` whitelist. Clients must
-be provisioned with appropriate access to send binary audio or receive TTS output.
+have the correct access to send binary audio or receive TTS output.
+
+## Related projects
+
+- [JarbasHiveMind/HiveMind-core](https://github.com/JarbasHiveMind/HiveMind-core) — the hub this plugin extends
+- [JarbasHiveMind/hivemind-plugin-manager](https://github.com/JarbasHiveMind/hivemind-plugin-manager) — loads this plugin by entry-point
+- [JarbasHiveMind/hivemind-mic-satellite](https://github.com/JarbasHiveMind/hivemind-mic-satellite) — reference satellite client for the microphone stream mode
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Docs
 
-- [docs/audio_flow.md](docs/audio_flow.md) — detailed STT/TTS flow, FakeMicrophone, per-client listeners
-- [docs/configuration.md](docs/configuration.md) — full configuration reference
-- [docs/operations.md](docs/operations.md) — plugin selection, satellite setup, authoring a binary plugin
+- [docs/audio_flow.md](docs/audio_flow.md): detailed STT/TTS flow, FakeMicrophone, per-client listeners
+- [docs/configuration.md](docs/configuration.md): full configuration reference
+- [docs/operations.md](docs/operations.md): plugin selection, satellite setup, authoring a binary plugin

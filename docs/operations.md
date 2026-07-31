@@ -108,3 +108,6 @@ entry_points={
 [project.entry-points."hivemind.binary.protocol"]
 "my-binary-plugin" = "my_package:MyBinaryProtocol"
 ```
+
+---
+[← Configuration](configuration.md) · [Home](../README.md)
