@@ -32,6 +32,17 @@ from hivemind_audio_binary_protocol.transformers import (DialogTransformersServi
                                                          UtteranceTransformersService)
 
 
+# The only audio format this node can process: the HIVEMIND-AUDIO-1 §2
+# default, signed 16-bit PCM at 16 kHz. There is no resampling step here, so
+# a payload that states anything else is rejected rather than misread (§2).
+SAMPLE_RATE = 16000
+SAMPLE_WIDTH = 2
+
+
+def _is_supported_audio_format(sample_rate: int, sample_width: int) -> bool:
+    return sample_rate == SAMPLE_RATE and sample_width == SAMPLE_WIDTH
+
+
 class AudioCallbacks(ListenerCallbacks):
     """
     Callbacks for handling various stages of audio recognition
@@ -97,8 +108,8 @@ class FakeMicrophone(Microphone):
     """
     queue: "Queue[Optional[bytes]]" = field(default_factory=Queue)
     _is_running: bool = False
-    sample_rate: int = 16000
-    sample_width: int = 2
+    sample_rate: int = SAMPLE_RATE
+    sample_width: int = SAMPLE_WIDTH
     sample_channels: int = 1
     chunk_size: int = 4096
 
@@ -380,13 +391,29 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         if client.peer not in self.listeners:
             self.add_listener(client)
         m: FakeMicrophone = self.listeners[client.peer].mic
-        if m.sample_rate != sample_rate or m.sample_width != sample_width:
+        if not _is_supported_audio_format(sample_rate, sample_width):
             LOG.debug(f"Got {len(bin_data)} bytes of audio data from {client.peer}")
             LOG.error(f"Sample rate/width mismatch! Got: ({sample_rate}, {sample_width}), "
-                      f"expected: ({m.sample_rate}, {m.sample_width})")
+                      f"expected: ({SAMPLE_RATE}, {SAMPLE_WIDTH})")
             # TODO - convert sample_rate if needed
         else:
             m.queue.put(bin_data)
+
+    def _reject_audio_format(self, sample_rate: int, sample_width: int,
+                             client: HiveMindClientConnection) -> None:
+        """Refuse an STT payload whose stated format this node can not process.
+
+        HIVEMIND-AUDIO-1 §2: reject rather than misread the bytes. Transcribing
+        them anyway gives the peer a plausible but wrong transcript, which is
+        worse than an explicit failure.
+        """
+        LOG.error(f"Rejecting STT audio from {client.peer}: unsupported format "
+                  f"({sample_rate}, {sample_width}), "
+                  f"expected: ({SAMPLE_RATE}, {SAMPLE_WIDTH})")
+        m = Message("recognizer_loop:speech.recognition.unknown",
+                    {"error": "unsupported_audio_format",
+                     "sample_rate": SAMPLE_RATE, "sample_width": SAMPLE_WIDTH})
+        client.send(HiveMessage(HiveMessageType.BUS, payload=m))
 
     def handle_stt_transcribe_request(self, bin_data: bytes, sample_rate: int, sample_width: int, lang: str,
                                       client: HiveMindClientConnection) -> None:
@@ -405,6 +432,9 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             client (HiveMindClientConnection): Connection to send the transcription response to.
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
+        if not _is_supported_audio_format(sample_rate, sample_width):
+            self._reject_audio_format(sample_rate, sample_width, client)
+            return
         audio = AudioData(bin_data, sample_rate, sample_width)
         tx = self.plugins.stt.transcribe(audio, lang)
         m = Message("recognizer_loop:transcribe.response", {"transcriptions": tx, "lang": lang})
@@ -423,6 +453,9 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             client (HiveMindClientConnection): Connection object for the client sending the data.
         """
         LOG.debug(f"Received binary STT input: {len(bin_data)} bytes")
+        if not _is_supported_audio_format(sample_rate, sample_width):
+            self._reject_audio_format(sample_rate, sample_width, client)
+            return
         audio = AudioData(bin_data, sample_rate, sample_width)
         tx = self.plugins.stt.transcribe(audio, lang)
         if tx:
