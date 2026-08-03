@@ -1,37 +1,44 @@
 # Changelog
 
-## [2.1.5a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a3) (2026-03-04)
+## [2.1.7a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.7a1) (2026-08-03)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5a2...2.1.5a3)
-
-**Merged pull requests:**
-
-- chore\(deps\): update dependency hivemind-core to v4 [\#34](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/34) ([renovate[bot]](https://github.com/apps/renovate))
-
-## [2.1.5a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a2) (2026-02-03)
-
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5a1...2.1.5a2)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a4...2.1.7a1)
 
 **Merged pull requests:**
 
-- chore\(deps\): update actions/setup-python action to v6 [\#33](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/33) ([renovate[bot]](https://github.com/apps/renovate))
-- chore\(deps\): update actions/checkout action to v6 [\#31](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/31) ([renovate[bot]](https://github.com/apps/renovate))
+- fix: reject STT audio in an unsupported format [\#51](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/51) ([JarbasAl](https://github.com/JarbasAl))
 
-## [2.1.5a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.5a1) (2026-01-23)
+## [2.1.6a4](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a4) (2026-07-31)
 
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.4a1...2.1.5a1)
-
-**Merged pull requests:**
-
-- fix: keep session\_id [\#35](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/35) ([JarbasAl](https://github.com/JarbasAl))
-
-## [2.1.4a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.4a1) (2025-12-18)
-
-[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.3...2.1.4a1)
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a3...2.1.6a4)
 
 **Merged pull requests:**
 
-- chore: Configure Renovate [\#29](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/29) ([renovate[bot]](https://github.com/apps/renovate))
+- docs: rewrite README in Simplified Technical English [\#49](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/49) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.1.6a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a3) (2026-06-23)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a2...2.1.6a3)
+
+**Merged pull requests:**
+
+- test: add hivescope e2e binary audio suite [\#46](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/46) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.1.6a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a2) (2026-06-20)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a1...2.1.6a2)
+
+**Merged pull requests:**
+
+- build: modernize packaging \(pyproject\) + CI \(gh-automations\) [\#43](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/43) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.1.6a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a1) (2026-06-05)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.5...2.1.6a1)
+
+**Merged pull requests:**
+
+- docs: zero-to-hero README and /docs coverage [\#40](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/40) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
