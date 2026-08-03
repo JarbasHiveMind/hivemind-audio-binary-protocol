@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.7a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.7a1) (2026-08-03)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a4...2.1.7a1)
+
+**Merged pull requests:**
+
+- fix: reject STT audio in an unsupported format [\#51](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/51) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.6a4](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.6a4) (2026-07-31)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a3...2.1.6a4)
