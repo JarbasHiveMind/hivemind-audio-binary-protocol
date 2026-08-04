@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.8a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.8a1) (2026-08-04)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.7a1...2.1.8a1)
+
+**Merged pull requests:**
+
+- fix\(deps\): allow hivemind-bus-client 1.x [\#55](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/55) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.7a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.7a1) (2026-08-03)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.6a4...2.1.7a1)
