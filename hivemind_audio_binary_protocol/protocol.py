@@ -170,6 +170,10 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
     hm_protocol: Optional['AudioReceiverProtocol'] = None
     callbacks: Optional[ClientCallbacks] = None
     listeners = {}
+    # peers currently streaming RAW_AUDIO in a format we can not process; they
+    # are told once, not once per chunk (AUDIO-1 §2 — a raw stream is
+    # continuous, so a per-chunk refusal would flood the peer)
+    refused_streams = set()
 
     def __post_init__(self):
         # Configure wakeword, TTS, STT, and VAD plugins
@@ -286,6 +290,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         Args:
             client: The HiveMind client connection.
         """
+        cls.refused_streams.discard(client.peer)
         if client.peer in cls.listeners:
             LOG.info(f"Stopping listener for key: {client.peer}")
             cls.listeners[client.peer].stop()
@@ -388,26 +393,30 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             sample_width (int): Sample width of the audio.
             client (HiveMindClientConnection): Connection object for the client sending the data.
         """
+        if not _is_supported_audio_format(sample_rate, sample_width):
+            # AUDIO-1 §2: refuse the stream instead of dropping it in silence.
+            # There is no in-band format negotiation in a raw stream, so a peer
+            # that is never told keeps sending into a void.
+            if client.peer not in self.refused_streams:
+                self.refused_streams.add(client.peer)
+                self._reject_audio_format(sample_rate, sample_width, client)
+            return
+
+        self.refused_streams.discard(client.peer)
         if client.peer not in self.listeners:
             self.add_listener(client)
         m: FakeMicrophone = self.listeners[client.peer].mic
-        if not _is_supported_audio_format(sample_rate, sample_width):
-            LOG.debug(f"Got {len(bin_data)} bytes of audio data from {client.peer}")
-            LOG.error(f"Sample rate/width mismatch! Got: ({sample_rate}, {sample_width}), "
-                      f"expected: ({SAMPLE_RATE}, {SAMPLE_WIDTH})")
-            # TODO - convert sample_rate if needed
-        else:
-            m.queue.put(bin_data)
+        m.queue.put(bin_data)
 
     def _reject_audio_format(self, sample_rate: int, sample_width: int,
                              client: HiveMindClientConnection) -> None:
-        """Refuse an STT payload whose stated format this node can not process.
+        """Refuse an audio payload whose stated format this node can not process.
 
         HIVEMIND-AUDIO-1 §2: reject rather than misread the bytes. Transcribing
         them anyway gives the peer a plausible but wrong transcript, which is
         worse than an explicit failure.
         """
-        LOG.error(f"Rejecting STT audio from {client.peer}: unsupported format "
+        LOG.error(f"Rejecting audio from {client.peer}: unsupported format "
                   f"({sample_rate}, {sample_width}), "
                   f"expected: ({SAMPLE_RATE}, {SAMPLE_WIDTH})")
         m = Message("recognizer_loop:speech.recognition.unknown",
