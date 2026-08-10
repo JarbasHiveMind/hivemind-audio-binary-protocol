@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.8a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.8a2) (2026-08-10)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.8a1...2.1.8a2)
+
+**Merged pull requests:**
+
+- fix: refuse a RAW\_AUDIO stream in a format we can not process [\#54](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/54) ([JarbasAl](https://github.com/JarbasAl))
+- docs: drop misleading listener terminology [\#53](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/53) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.8a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.8a1) (2026-08-04)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.7a1...2.1.8a1)
