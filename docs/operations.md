@@ -38,9 +38,13 @@ The hub's `FakeMicrophone` expects:
 - Sample width: 2 bytes (16-bit PCM)
 - Channels: 1 (mono)
 
-Configure the satellite's microphone to match. The plugin logs an error if
-incoming audio has a different rate or width but does not convert — configure
-the satellite correctly rather than relying on server-side conversion.
+Configure the satellite's microphone to match. Audio with a different rate or width is
+not converted: the frame is dropped and the client is told, with a
+`recognizer_loop:speech.recognition.unknown` message carrying
+`{"error": "unsupported_audio_format", "sample_rate": 16000, "sample_width": 2}`.
+A continuous microphone stream gets that refusal once per peer, not once per chunk, so
+the log shows one error per offending satellite for that path. One-shot STT requests are
+refused per request, so a client retrying in a loop does log repeatedly.
 
 ## Access key requirements
 
