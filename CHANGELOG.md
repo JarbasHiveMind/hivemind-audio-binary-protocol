@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.0a1) (2026-08-10)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.8a2...2.2.0a1)
+
+**Merged pull requests:**
+
+- feat: canonical transformer runners + audio/tts transformer pipelines [\#48](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/48) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.8a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.1.8a2) (2026-08-10)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.1.8a1...2.1.8a2)
