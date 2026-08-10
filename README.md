@@ -4,8 +4,6 @@ Binary audio plugin for [hivemind-core](https://github.com/JarbasHiveMind/HiveMi
 
 The plugin adds server-side WakeWord detection, VAD, STT, and TTS to a hivemind-core hub. Lightweight satellites, such as [hivemind-mic-satellite](https://github.com/JarbasHiveMind/hivemind-mic-satellite), stream raw audio to the hub and receive transcriptions or synthesized speech. The satellites do not run those models locally.
 
-This plugin replaces the old "HiveMind-listener" proof-of-concept.
-
 ## Where it fits
 
 ```
