@@ -97,6 +97,8 @@ The plugin's config block mirrors the OVOS plugin config convention. Each sub-pl
 | `utterance_transformers` | List of OVOS utterance transformer plugin names. |
 | `dialog_transformers` | List of OVOS dialog transformer plugin names. |
 | `metadata_transformers` | List of OVOS metadata transformer plugin names. |
+| `audio_transformers` | List of OVOS audio transformer plugin names applied to raw audio before STT. |
+| `tts_transformers` | List of OVOS tts transformer plugin names applied to synthesized audio after TTS. |
 
 If the config block is omitted, the plugin falls back to reading `mycroft.conf`
 (the standard OVOS configuration file) to select plugins.

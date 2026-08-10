@@ -67,9 +67,12 @@ Default audio format expected:
 - Sample width: 2 bytes (16-bit PCM)
 - Channels: 1 (mono)
 
-If the satellite sends a different format (different sample rate or width), the
-plugin logs an error. Sample rate conversion is not implemented — configure the
-satellite to match the hub's expected format.
+If the satellite sends a different format (different sample rate or width), the frame is
+dropped and the client gets a `recognizer_loop:speech.recognition.unknown` BUS message
+with `{"error": "unsupported_audio_format", "sample_rate": 16000, "sample_width": 2}`.
+For a continuous microphone stream the refusal is sent once per peer, not once per chunk,
+and the peer is cleared again as soon as it sends a supported frame. Sample rate
+conversion is not implemented, so configure the satellite to match the hub's format.
 
 ## STT transcription request (one-shot mode)
 
