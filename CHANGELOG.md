@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0a4](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.0a4) (2026-08-15)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.0a3...2.2.0a4)
+
+**Merged pull requests:**
+
+- docs: add AGENTS.md with per-repo agent conventions [\#63](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/63) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.0a3](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.0a3) (2026-08-10)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.0a2...2.2.0a3)
