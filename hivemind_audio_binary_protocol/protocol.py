@@ -111,7 +111,11 @@ class FakeMicrophone(Microphone):
     """
     A async implementation of a Microphone from a client connection.
     """
-    queue: "Queue[Optional[bytes]]" = field(default_factory=Queue)
+    # Bounded to ~a few seconds of audio at the default 4096-byte chunk size
+    # (256ms/chunk @ 16kHz mono 16-bit -> 200 chunks ~= 51s worst case, well
+    # above the STT/VAD drain cadence). An unbounded queue lets a client that
+    # streams faster than it is drained grow the process memory without limit.
+    queue: "Queue[Optional[bytes]]" = field(default_factory=lambda: Queue(maxsize=200))
     _is_running: bool = False
     sample_rate: int = SAMPLE_RATE
     sample_width: int = SAMPLE_WIDTH
@@ -123,6 +127,25 @@ class FakeMicrophone(Microphone):
         Start the microphone
         """
         self._is_running = True
+
+    def put_chunk(self, chunk: bytes) -> None:
+        """
+        Enqueue a chunk of audio data, dropping the oldest queued chunk if full.
+
+        A live mic feed must never block or grow unbounded when the producer
+        (network receive) outpaces the consumer (STT/VAD read_chunk): recent
+        audio is what matters, so on overflow the oldest chunk is discarded to
+        make room for the new one.
+        """
+        while True:
+            try:
+                self.queue.put_nowait(chunk)
+                return
+            except queue.Full:
+                try:
+                    self.queue.get_nowait()
+                except queue.Empty:
+                    pass
 
     def read_chunk(self) -> Optional[bytes]:
         """
@@ -411,16 +434,35 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             message (Message, optional): A Mycroft Message object containing 'audio' (Base64) and optional 'lang'.
 
         Returns:
-            List[Tuple[str, float]]: List of transcribed utterances with confidence scores.
+            List[Tuple[str, float]]: List of transcribed utterances with confidence scores, or an
+            empty list if the payload is malformed or declares an unsupported audio format
+            (mirrors the binary STT paths' rejection instead of raising or misreading the bytes).
         """
         b64audio = message.data["audio"]
         lang = message.data.get("lang", self.plugins.stt.lang)
         sample_rate = message.data.get("sample_rate", 16000)
         sample_width = message.data.get("sample_width", 2)
 
-        s = time.monotonic()
-        wav_data = pybase64.b64decode(b64audio)
-        LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
+        if not _is_supported_audio_format(sample_rate, sample_width):
+            LOG.error(f"Rejecting b64 audio: unsupported format "
+                      f"({sample_rate}, {sample_width}), "
+                      f"expected: ({SAMPLE_RATE}, {SAMPLE_WIDTH})")
+            self.hm_protocol.agent_protocol.bus.emit(
+                Message("recognizer_loop:speech.recognition.unknown",
+                        {"error": "unsupported_audio_format",
+                         "sample_rate": SAMPLE_RATE, "sample_width": SAMPLE_WIDTH}))
+            return []
+
+        try:
+            s = time.monotonic()
+            wav_data = pybase64.b64decode(b64audio)
+            LOG.debug(f"b64 decoding took: {time.monotonic() - s} seconds")
+        except Exception as e:
+            LOG.exception(f"failed to decode b64 audio: {e}")
+            self.hm_protocol.agent_protocol.bus.emit(
+                Message("recognizer_loop:speech.recognition.unknown",
+                        {"error": "invalid_b64_audio"}))
+            return []
 
         audio = AudioData(wav_data, sample_rate, sample_width)
         audio, context = self.transform_audio(audio)
@@ -453,7 +495,7 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         if client.peer not in self.listeners:
             self.add_listener(client)
         m: FakeMicrophone = self.listeners[client.peer].mic
-        m.queue.put(bin_data)
+        m.put_chunk(bin_data)
 
     def _reject_audio_format(self, sample_rate: int, sample_width: int,
                              client: HiveMindClientConnection) -> None:
@@ -545,8 +587,13 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
         self.hm_protocol.agent_protocol.bus.emit(msg)
 
     def handle_transcribe_b64(self, message: Message):
+        source = message.context.get("source")
+        client = self.hm_protocol.clients.get(source)
+        if client is None:
+            LOG.error(f"Can not reply to recognizer_loop:b64_transcribe: "
+                      f"unknown source client '{source}'")
+            return
         lang = get_message_lang(message)
-        client = self.hm_protocol.clients[message.context["source"]]
         msg: Message = message.reply("recognizer_loop:b64_transcribe.response",
                                      {"lang": lang})
         msg.data["transcriptions"] = self.transcribe_b64_audio(message)
