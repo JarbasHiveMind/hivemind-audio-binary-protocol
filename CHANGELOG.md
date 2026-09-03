@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.1a1) (2026-09-03)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.0a4...2.2.1a1)
+
+**Merged pull requests:**
+
+- fix: bound audio queue, guard b64 STT format+decode, drop version caps [\#65](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/65) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.0a4](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.0a4) (2026-08-15)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.0a3...2.2.0a4)
