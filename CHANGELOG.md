@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.2a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.2a1) (2026-09-10)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.1a1...2.2.2a1)
+
+**Closed issues:**
+
+- Add hivescope binary-protocol e2e \(currently 0 tests\) [\#45](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/issues/45)
+
+**Merged pull requests:**
+
+- fix: validate hotwords/wake\_word at AudioBinaryProtocol construction [\#67](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/67) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [2.2.1a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.1a1) (2026-09-03)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.0a4...2.2.1a1)
