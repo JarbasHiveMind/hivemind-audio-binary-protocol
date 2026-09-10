@@ -235,7 +235,22 @@ class AudioBinaryProtocol(BinaryDataHandlerProtocol):
             LOG.debug(f"Loading VAD '{self.config['vad']['module']}': {self.config['vad']}")
             vad = OVOSVADFactory.create(self.config["vad"])
             ww = self.config.get("wakeword") or self.config.get("wake_word") # backwards compat
-          
+
+            # a deployer config block that sets stt/tts/vad but omits hotwords
+            # (or a wake_word) is a *partial* block and skips the whole-block
+            # mycroft.conf fallback above; resolve those two the same way here
+            # so a misconfigured hub fails at construction, not on the first
+            # RAW_AUDIO frame a satellite streams
+            from ovos_config import Configuration
+            if "hotwords" not in self.config:
+                self.config["hotwords"] = Configuration()["hotwords"]
+            if not ww:
+                ww = Configuration()["listener"]["wake_word"]
+            if ww not in self.config["hotwords"]:
+                raise ValueError(f"selected wake word '{ww}' has no entry in "
+                                  f"the 'hotwords' config, satellites streaming "
+                                  f"audio would crash this hub")
+
             self.plugins = PluginOptions(
                 wakeword=ww,  # TODO - allow per client
                 stt=stt,
