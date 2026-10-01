@@ -57,20 +57,51 @@ def make_wav_bytes(num_samples: int = 16000) -> bytes:
     return bytes(hdr) + pcm
 
 
+def make_pcm_bytes(num_samples: int = 16000) -> bytes:
+    """Headerless 16-bit mono PCM: what the UPLINK STT paths actually carry.
+
+    HIVEMIND-AUDIO-1 §2: "A ``RAW_AUDIO`` payload (HIVEMIND-WIRE-1 §5), and the
+    audio inside the STT tags, carries **uncompressed PCM** samples." The
+    sample rate and width travel as metadata, not in the bytes, and a receiver
+    "MUST honour the metadata values when present". So the payload is PCM by
+    construction: ``protocol.py`` builds ``AudioData(payload, sample_rate,
+    sample_width)`` on all four STT paths, which reads a container's 44-byte
+    header as audio samples.
+
+    Panel decision ``hivemind-b64-stt-audio-pcm-or-wav`` closed with choice
+    ``pcm`` on 2026-09-29.
+
+    ``make_wav_bytes`` is kept, and is still correct, for the DOWNLINK: a TTS
+    response carries a container because a client has to play it.
+    """
+    return b"\x00\x01" * num_samples
+
+
 # ── Stub plugins ──────────────────────────────────────────────────────────
 # Concrete, dependency-free subclasses of the OVOS plugin templates. They
 # record what audio reached them so tests can assert the protocol decoded the
 # payload correctly, without pulling in (and downloading) real models.
 
 class StubSTT(STT):
-    """Records the raw bytes handed to transcribe() and returns a fixed result."""
+    """Records the raw bytes handed to transcribe() and returns a fixed result.
+
+    Set ``refuse_containers`` to make the stub behave like the shipped ASR
+    plugin: ``hivemind-wyoming-binary-protocol#7`` refuses a payload that
+    carries a container header instead of reading the header as samples. The
+    bytes are still recorded, so a test can prove the protocol passed them
+    through unparsed and the refusal happened at the engine.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.transcribed = []  # list[bytes] — frame_data of each AudioData seen
+        self.refuse_containers = False
 
     def transcribe(self, audio, lang=None):
-        self.transcribed.append(getattr(audio, "frame_data", None))
+        frames = getattr(audio, "frame_data", None)
+        self.transcribed.append(frames)
+        if self.refuse_containers and frames and frames[:4] == b"RIFF":
+            return []
         return [("hello world", 0.99)]
 
     def execute(self, audio, language=None):

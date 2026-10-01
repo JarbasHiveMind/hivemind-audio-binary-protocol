@@ -21,7 +21,7 @@ from hivemind_bus_client.message import HiveMessage, HiveMessageType
 from hivemind_bus_client.serialization import HiveMindBinaryPayloadType
 from ovos_bus_client.message import Message
 
-from .conftest import make_wav_bytes
+from .conftest import make_pcm_bytes, make_wav_bytes
 
 
 def _wait_satellite_bus(satellite, msg_type, timeout=5.0):
@@ -116,20 +116,21 @@ class TestRawAudioStreaming:
 class TestBinarySTT:
 
     def test_stt_transcribe_decodes_payload(self, audio_topology):
-        """STT_AUDIO_TRANSCRIBE: the WAV bytes are handed to STT verbatim."""
+        """STT_AUDIO_TRANSCRIBE: the PCM samples are handed to STT verbatim."""
         _, master, satellite, protocol, stt = audio_topology
 
-        wav = make_wav_bytes(2000)
+        pcm = make_pcm_bytes(2000)
         satellite.send(HiveMessage(
-            HiveMessageType.BINARY, payload=wav,
+            HiveMessageType.BINARY, payload=pcm,
             bin_type=HiveMindBinaryPayloadType.STT_AUDIO_TRANSCRIBE,
             metadata={"sample_rate": 16000, "sample_width": 2, "lang": "en-us"},
         ))
         time.sleep(0.2)
 
-        assert wav in stt.transcribed, (
-            "decoded binary STT payload did not reach the STT engine intact"
-        )
+        assert pcm in stt.transcribed, (
+            "the decoded binary STT payload did not reach the STT engine "
+            "intact; AUDIO-1 §2 puts uncompressed PCM inside the STT tags and "
+            "the rate and width in metadata")
 
     def test_stt_transcribe_response_returned_to_satellite(self, audio_topology):
         """STT_AUDIO_TRANSCRIBE produces a transcribe.response back to the satellite."""
@@ -137,9 +138,9 @@ class TestBinarySTT:
 
         event, result = _wait_satellite_bus(satellite, "recognizer_loop:transcribe.response")
 
-        wav = make_wav_bytes(2000)
+        pcm = make_pcm_bytes(2000)
         satellite.send(HiveMessage(
-            HiveMessageType.BINARY, payload=wav,
+            HiveMessageType.BINARY, payload=pcm,
             bin_type=HiveMindBinaryPayloadType.STT_AUDIO_TRANSCRIBE,
             metadata={"sample_rate": 16000, "sample_width": 2, "lang": "en-us"},
         ))
@@ -151,18 +152,55 @@ class TestBinarySTT:
         """STT_AUDIO_HANDLE: decoded audio is transcribed and injected as an utterance."""
         _, master, satellite, protocol, stt = audio_topology
 
+        pcm = make_pcm_bytes(2000)
+        satellite.send(HiveMessage(
+            HiveMessageType.BINARY, payload=pcm,
+            bin_type=HiveMindBinaryPayloadType.STT_AUDIO_HANDLE,
+            metadata={"sample_rate": 16000, "sample_width": 2, "lang": "en-us"},
+        ))
+        time.sleep(0.2)
+
+        assert pcm in stt.transcribed, (
+            "STT_AUDIO_HANDLE payload not decoded to STT as PCM")
+        injected = master.agent_protocol.last_injected("recognizer_loop:utterance")
+        assert injected is not None, "no utterance injected on the agent bus"
+        assert injected.data["utterances"] == ["hello world"]
+
+    def test_stt_handle_container_payload_is_refused(self, audio_topology):
+        """A container payload reaches the engine unparsed, and is refused there.
+
+        This cell keeps the coverage the WAV cells used to carry, and pins the
+        refusal instead of the transcription. Two rules meet here:
+
+        * AUDIO-1 §7 MUST NOT "treat the payload bytes as self-describing --
+          the tag and metadata are the only description (§5)". So this node
+          strips no header: the 44 container bytes arrive at the engine.
+        * AUDIO-1 §3 MUST "signal an unsuccessful recognition to the peer
+          rather than injecting an empty utterance". So when the engine
+          refuses, the peer is told and no utterance is injected.
+        """
+        _, master, satellite, protocol, stt = audio_topology
+        stt.refuse_containers = True
+
+        event, _ = _wait_satellite_bus(
+            satellite, "recognizer_loop:speech.recognition.unknown")
+
         wav = make_wav_bytes(2000)
         satellite.send(HiveMessage(
             HiveMessageType.BINARY, payload=wav,
             bin_type=HiveMindBinaryPayloadType.STT_AUDIO_HANDLE,
             metadata={"sample_rate": 16000, "sample_width": 2, "lang": "en-us"},
         ))
-        time.sleep(0.2)
 
-        assert wav in stt.transcribed, "STT_AUDIO_HANDLE payload not decoded to STT"
-        injected = master.agent_protocol.last_injected("recognizer_loop:utterance")
-        assert injected is not None, "no utterance injected on the agent bus"
-        assert injected.data["utterances"] == ["hello world"]
+        assert event.wait(timeout=5.0), (
+            "the peer was never told the recognition failed; AUDIO-1 §3 "
+            "requires that signal instead of an empty utterance")
+        assert wav in stt.transcribed, (
+            "the container header was parsed or stripped in transit; AUDIO-1 "
+            "§7 forbids treating the payload bytes as self-describing")
+        assert master.agent_protocol.last_injected(
+            "recognizer_loop:utterance") is None, (
+            "a refused payload still injected an utterance")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -175,16 +213,18 @@ class TestBase64Audio:
         """recognizer_loop:b64_transcribe is injected onto the master agent bus."""
         _, master, satellite, protocol, stt = audio_topology
 
-        wav = make_wav_bytes(2000)
-        b64_audio = base64.b64encode(wav).decode("utf-8")
+        pcm = make_pcm_bytes(2000)
+        b64_audio = base64.b64encode(pcm).decode("utf-8")
         satellite.send(Message("recognizer_loop:b64_transcribe", {
             "audio": b64_audio, "lang": "en-us",
+            "sample_rate": 16000, "sample_width": 2,
         }))
         time.sleep(0.2)
 
         master.agent_protocol.assert_injected("recognizer_loop:b64_transcribe")
         # the handler base64-decodes and runs STT on the exact bytes
-        assert wav in stt.transcribed, "b64 STT payload not decoded before transcribe"
+        assert pcm in stt.transcribed, (
+            "b64 STT payload not decoded to PCM before transcribe")
 
     def test_b64_transcribe_response_returned_to_satellite(self, audio_topology):
         """The b64 transcribe handler replies with transcriptions to the satellite."""
@@ -192,10 +232,11 @@ class TestBase64Audio:
 
         event, result = _wait_satellite_bus(satellite, "recognizer_loop:b64_transcribe.response")
 
-        wav = make_wav_bytes(2000)
-        b64_audio = base64.b64encode(wav).decode("utf-8")
+        pcm = make_pcm_bytes(2000)
+        b64_audio = base64.b64encode(pcm).decode("utf-8")
         satellite.send(Message("recognizer_loop:b64_transcribe", {
             "audio": b64_audio, "lang": "en-us",
+            "sample_rate": 16000, "sample_width": 2,
         }))
 
         assert event.wait(timeout=5.0), "no b64_transcribe.response delivered to satellite"
