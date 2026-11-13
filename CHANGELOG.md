@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.3a2](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.3a2) (2026-11-13)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.3a1...2.2.3a2)
+
+**Merged pull requests:**
+
+- test\(e2e\): the uplink STT cells send PCM, not a WAV container [\#70](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/70) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [2.2.3a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.3a1) (2026-11-13)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.2a1...2.2.3a1)
