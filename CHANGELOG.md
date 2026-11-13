@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.3a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.3a1) (2026-11-13)
+
+[Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.2a1...2.2.3a1)
+
+**Merged pull requests:**
+
+- fix\(ci\): set test\_path so the build test actually runs the tests [\#69](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/pull/69) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [2.2.2a1](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/tree/2.2.2a1) (2026-09-10)
 
 [Full Changelog](https://github.com/JarbasHiveMind/hivemind-audio-binary-protocol/compare/2.2.1a1...2.2.2a1)
