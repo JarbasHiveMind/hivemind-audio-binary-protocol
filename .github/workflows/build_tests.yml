@@ -1,25 +1,19 @@
-name: Run Build Tests
+name: Build Tests
 on:
-  push:
+  pull_request:
+    branches: [dev, master]
   workflow_dispatch:
-
 jobs:
-  build_tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref }}
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-      - name: Install Build Tools
-        run: |
-          python -m pip install build wheel
-      - name: Build Distribution Packages
-        run: |
-          python setup.py bdist_wheel
-      - name: Install package
-        run: |
-          pip install .
+  build:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/build-tests.yml@dev
+    with:
+      python_versions: '["3.10", "3.11", "3.12", "3.13"]'
+      # Without test_path the reusable workflow skips its Run Tests step
+      # entirely (it is gated on `inputs.test_path != ''`) and still reports
+      # success, so this job built and installed the wheel and ran no test.
+      # The test extra carries hivescope, which the e2e tests import. Without
+      # install_extras it is never installed and collection fails with
+      # ModuleNotFoundError, which is the same defect as the missing test_path:
+      # a caller that does not pass what the workflow needs.
+      install_extras: 'test'
+      test_path: 'tests'

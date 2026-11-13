@@ -19,3 +19,7 @@ dist
 # Created by unit tests
 .pytest_cache/
 /.gtm/
+
+dist/
+build/
+*.egg-info/
