@@ -8,3 +8,12 @@ jobs:
     uses: OpenVoiceOS/gh-automations/.github/workflows/build-tests.yml@dev
     with:
       python_versions: '["3.10", "3.11", "3.12", "3.13"]'
+      # Without test_path the reusable workflow skips its Run Tests step
+      # entirely (it is gated on `inputs.test_path != ''`) and still reports
+      # success, so this job built and installed the wheel and ran no test.
+      # The test extra carries hivescope, which the e2e tests import. Without
+      # install_extras it is never installed and collection fails with
+      # ModuleNotFoundError, which is the same defect as the missing test_path:
+      # a caller that does not pass what the workflow needs.
+      install_extras: 'test'
+      test_path: 'tests'
